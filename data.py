@@ -70,7 +70,7 @@ class LttcDataset(torch.utils.data.Dataset):
     # process
     #df = df.progress_apply(self.transform_data_row, axis=1)
     df = df.apply(self.transform_data_row, axis=1)
-    df['seqbow'] = df.seq.apply(lambda s: s.new_zeros(len(self.index)).scatter(dim=0, index=s[self.nbos:s.size(0)-self.neos], source=1)) # create bag of word representation w/o bos and eos
+    df['seqbow'] = df.seq.apply(lambda s: s.new_zeros(len(self.index)).scatter(dim=0, index=s[self.nbos:s.size(0)-self.neos], value=1)) # create bag of word representation w/o bos and eos
     # pad
     df['seq'] = df.seq.apply(lambda s: pad(s, self.maxseqlen, self.padidx))
     df['seqlen'] = df.seqlen.apply(lambda l: min(l, self.maxseqlen))
@@ -138,7 +138,7 @@ class LttcDataset(torch.utils.data.Dataset):
 
     tqdm.write('Preparing data...', file=sys.stderr)
     samples = samples.progress_apply(self.transform_data_row, axis=1)
-    samples['seqbow'] = samples.seq.apply(lambda s: s.new_zeros(len(self.index)).scatter(dim=0, index=s[self.nbos:s.size(0)-self.neos], source=1)) # create bag of word representation w/o bos and eos
+    samples['seqbow'] = samples.seq.apply(lambda s: s.new_zeros(len(self.index)).scatter(dim=0, index=s[self.nbos:s.size(0)-self.neos], value=1)) # create bag of word representation w/o bos and eos
     # pad
     if not self.maxseqlen or self.maxseqlen < 0:
       self.maxseqlen = samples.seqlen.max()
