@@ -8,7 +8,7 @@ embedding/*
 savedmodels/*
 lttc.tar.gz
 lttc-models.tar.gz
-try-out-sandbox/*
+tryout-sandbox/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

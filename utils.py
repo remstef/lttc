@@ -445,9 +445,6 @@ def create_tcp_server(HOST='127.0.0.1', PORT=8881, linehandler=lambda l: l):
       def __init__(self, *args, **kwargs):
         super(Server, self).__init__(*args, **kwargs)
 
-      def handle_timeout(self):
-        print('Timeout', file = sys.stderr)
-
     #socketserver.ThreadingTCPServer((HOST, PORT), TCPHandler).serve_forever()
     srvr = Server((HOST, PORT), TCPHandler)
     # start
