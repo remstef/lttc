@@ -1,0 +1,22 @@
+###
+# pre install:
+#   pip install cython
+# install:
+#   pip install -r requirements.txt
+# notes:
+#   - if necessary install pyfasttext from source on MAC (clang/llvm must be installed):
+#     git checkout git@github.com:vrasneur/pyfasttext.git & cd pyfasttext & git checkout 0.4.5
+#     CPPFLAGS="-stdlib=libc++" CXX=/usr/local/opt/llvm/bin/clang++  CC=/usr/local/opt/llvm/bin/clang++  python setup.py install
+###
+cysignals>=1.10.2
+pandas>=0.24.2
+numpy>=1.16.2
+tqdm>=4.26.0
+scipy>=1.2.1
+scikit-learn>=0.20.3
+torch>=1.0.0
+pyfasttext>=0.4.6
+spacy>=2.1.3
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-2.1.0/en_core_web_sm-2.1.0.tar.gz#egg=en_core_web_sm-2.1.0
+https://github.com/explosion/spacy-models/releases/download/de_core_news_sm-2.1.0/de_core_news_sm-2.1.0.tar.gz#egg=de_core_news_sm-2.1.0
+https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-2.1.0/fr_core_news_sm-2.1.0.tar.gz#egg=fr_core_news_sm-2.1.0
