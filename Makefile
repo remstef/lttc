@@ -15,6 +15,10 @@ install:
 	@echo installing requirements 
 	pip install cython &> install.log
 	pip install -r requirements.txt >> install.log 2>&1 
+	
+update:
+	@echo updating requirements 
+	pip install -U -r requirements.txt
 
 package:
 	@echo packaging lttc
