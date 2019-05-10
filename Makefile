@@ -24,6 +24,8 @@ package:
 	@echo packaging lttc
 	@tar -czvf lttc.tar.gz \
 	  Makefile \
+	  README.md \
+	  LICENSE \
 	  requirements.txt \
 	  lttc.py \
 	  data.py \
