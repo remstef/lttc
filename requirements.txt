@@ -9,6 +9,7 @@
 #     CPPFLAGS="-stdlib=libc++" CXX=/usr/local/opt/llvm/bin/clang++  CC=/usr/local/opt/llvm/bin/clang++  python setup.py install
 ###
 cysignals>=1.10.2
+pyyaml>=3.13
 pandas>=0.24.2
 numpy>=1.16.2
 tqdm>=4.26.0

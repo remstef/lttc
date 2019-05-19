@@ -8,7 +8,7 @@
 import argparse
 import time
 import os, sys
-import pickle
+import yaml
 import math
 from tqdm import tqdm
 import torch
@@ -303,8 +303,8 @@ class LttcPipe(object):
 
     # save the parameters
     args.modelepoch = epoch
-    with open(os.path.join(args.model, 'parameters.pkl'), 'wb') as f:
-      pickle.dump(args, f)
+    with open(os.path.join(args.model, 'parameters.yml'), 'wt') as f:
+      yaml.dump(args, f)
 
   def savepredictions(self, args, ids, logprobs, predictions, targets, scores):
     outfile = os.path.join(args.model, 'model.predictions.tsv')
@@ -449,8 +449,8 @@ class LttcPipe(object):
 
   def load(self, dirname):
     # load model args
-    with open(os.path.join(dirname, 'parameters.pkl'), 'rb') as f:
-      self.pargs.modelargs = pickle.load(f)
+    with open(os.path.join(dirname, 'parameters.yml'), 'rt') as f:
+      self.pargs.modelargs = yaml.load(f)
     print(self.pargs.modelargs, file=sys.stderr)
     # load model
     with open(os.path.join(dirname, 'model.pt'), 'rb') as f:
