@@ -141,7 +141,7 @@ class LttcDataset(torch.utils.data.Dataset):
     samples['seqbow'] = samples.seq.apply(lambda s: s.new_zeros(len(self.index)).scatter(dim=0, index=s[self.nbos:s.size(0)-self.neos], value=1)) # create bag of word representation w/o bos and eos
     # pad
     if not self.maxseqlen or self.maxseqlen < 0:
-      self.maxseqlen = samples.seqlen.max()
+      self.maxseqlen = samples.seqlen.max().item()
     samples['seq'] = samples.seq.progress_apply(lambda s: pad(s, self.maxseqlen, self.padidx))
     samples['seqlen'] = samples.seqlen.progress_apply(lambda l: min(l, self.maxseqlen))
     samples = samples[samples.seqlen > (self.nbos + self.neos)] # filter empty samples

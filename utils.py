@@ -7,6 +7,7 @@
 import sys, os
 import random
 import pickle
+import yaml
 import torch.utils.data
 
 
@@ -29,6 +30,12 @@ class AttributeHolder(object):
     if not hasattr(self, key):
       return None
     return getattr(self, key)
+  def dump(self, dest=None):
+    return yaml.dump(self.__dict__, dest)
+  def load(self, src):
+    d = yaml.load(src)
+    [ self.__setitem__(k,v) for k,v in d.items() ]
+    return self
   def has(self, key):
     if hasattr(self, key):
       return self.__getitem__(key) is not None

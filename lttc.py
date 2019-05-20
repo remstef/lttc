@@ -66,7 +66,7 @@ class LttcPipe(object):
 
   def parseSystemArgs(self):
     parser = self.prepareSystemArgs()
-    args = parser.parse_args()
+    args = utils.AttributeHolder(**parser.parse_args().__dict__)
     args.convfilters = [ int(x) for x in filter(lambda x: x, map(lambda x: x.strip(), args.convfilters.strip(' ,').split(','))) ]
     args.convwindows = [ int(x) for x in filter(lambda x: x, map(lambda x: x.strip(), args.convwindows.strip(' ,').split(','))) ]
     args.convstrides = [ int(x) for x in filter(lambda x: x, map(lambda x: x.strip(), args.convstrides.strip(' ,').split(','))) ]
@@ -115,11 +115,11 @@ class LttcPipe(object):
     self.pargs.emword_pad_idx=trainset.padidx
     self.pargs.best_run_test_valname = 'F'
 
-    args.maxseqlen = trainset.maxseqlen
-    args.ntrainsamples = len(trainset)
-    args.ntoken = len(trainset.index)
-    args.npositions = len(trainset.posiindex)
-    args.nclasses = len(self.pargs.classindex)
+    self.pargs.maxseqlen = trainset.maxseqlen
+    self.pargs.ntrainsamples = len(trainset)
+    self.pargs.ntoken = len(trainset.index)
+    self.pargs.npositions = len(trainset.posiindex)
+    self.pargs.nclasses = len(self.pargs.classindex)
     return args
 
 
@@ -158,7 +158,7 @@ class LttcPipe(object):
 
     self.pargs.trainloader = train_loader
     self.pargs.testloader = test_loader
-    args.ntrainbatches = len(train_loader)
+    self.pargs.ntrainbatches = len(train_loader)
     return args
 
 
@@ -304,7 +304,7 @@ class LttcPipe(object):
     # save the parameters
     args.modelepoch = epoch
     with open(os.path.join(args.model, 'parameters.yml'), 'wt') as f:
-      yaml.dump(args, f)
+      args.dump(f)
 
   def savepredictions(self, args, ids, logprobs, predictions, targets, scores):
     outfile = os.path.join(args.model, 'model.predictions.tsv')
@@ -388,11 +388,11 @@ class LttcPipe(object):
         targets.extend(batch_targets.tolist())
         sample_i += batch_targets.size(0)
 
-        if ((sample_i - report_interval_begin_sample) // args.report_after_n_samples) > 0:
+        if ((sample_i - report_interval_begin_sample) // self.pargs.report_after_n_samples) > 0:
           cur_loss = train_loss_batch[report_interval_begin_batch:(batch_i+1)].mean()
           cur_scores = self.getscores(targets[report_interval_begin_sample:], predictions[report_interval_begin_sample:])
           cum_scores = self.getscores(targets, predictions)
-          tqdm.write(self.message_status_interval('*** training status ***', report_i+1, args.status_reports, epoch, args.epochs, report_interval_begin_batch, batch_i+1, args.ntrainbatches, args.batch_size, report_interval_begin_sample, len(targets), args.ntrainsamples, batch_start_time, cur_loss, train_loss_batch.mean(), cur_scores, cum_scores))
+          tqdm.write(self.message_status_interval('*** training status ***', report_i+1, args.status_reports, epoch, args.epochs, report_interval_begin_batch, batch_i+1, self.pargs.ntrainbatches, args.batch_size, report_interval_begin_sample, len(targets), self.pargs.ntrainsamples, batch_start_time, cur_loss, train_loss_batch.mean(), cur_scores, cum_scores))
           report_interval_begin_sample = len(targets)
           report_interval_begin_batch = batch_i+1
           report_i += 1
@@ -404,9 +404,9 @@ class LttcPipe(object):
     # Run pipeline
     ###
     best_run = utils.AttributeHolder(test_val=0, epoch=0)
-    args.status_reports = min(args.status_reports, args.ntrainbatches)
-    args.report_after_n_samples = math.ceil(args.ntrainsamples / (args.status_reports+1))
-    self.pargs.confusion_meter = torchnet.meter.ConfusionMeter(args.nclasses, normalized=True)
+    args.status_reports = min(args.status_reports, self.pargs.ntrainbatches)
+    self.pargs.report_after_n_samples = math.ceil(self.pargs.ntrainsamples / (args.status_reports+1))
+    self.pargs.confusion_meter = torchnet.meter.ConfusionMeter(self.pargs.nclasses, normalized=True)
     process = self.pargs.modelprocessfun
     for epoch in tqdm(range(1,args.epochs+1), ncols=89, desc = 'Epochs'):
       epoch_start_time = time.time()
@@ -450,7 +450,7 @@ class LttcPipe(object):
   def load(self, dirname):
     # load model args
     with open(os.path.join(dirname, 'parameters.yml'), 'rt') as f:
-      self.pargs.modelargs = yaml.load(f)
+      self.pargs.modelargs = utils.AttributeHolder().load(f)
     print(self.pargs.modelargs, file=sys.stderr)
     # load model
     with open(os.path.join(dirname, 'model.pt'), 'rb') as f:
