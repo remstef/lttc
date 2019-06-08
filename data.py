@@ -12,6 +12,7 @@ import torch
 import torch.utils
 import torch.utils.data
 from utils import Index, AttributeHolder, pad, pickle_read_large, pickle_dump_large, dataAsLongDeviceTensor
+from pytorch_pretrained_bert import BertTokenizer
 import sklearn.datasets
 import sklearn.metrics
 
@@ -46,6 +47,7 @@ class LttcDataset(torch.utils.data.Dataset):
     super(LttcDataset, self).__init__()
     self.path = path
     self.maxseqlen = maxseqlen
+    self.maxseqlen_bert = maxseqlen_bert
     self.nbos = max(0, nbos)
     self.neos = max(1, neos)
     self.index = index if index is not None else Index()
@@ -60,7 +62,8 @@ class LttcDataset(torch.utils.data.Dataset):
     self.device = torch.device('cpu')
     self.lang = lang
     self.spacy_model = importSpacy(self.lang)
-    self.samples = pandas.DataFrame(columns = [ 'id', 'filename', 'rawdata', 'spacydata', 'seq', 'seqlen', 'seq_recon', 'pseq', 'pseq_rev', 'label', 'labelid' ])
+    self.bert_tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case='uncased' in bert_model) if isinstance(bert_model, str) else bert_model
+    self.samples = pandas.DataFrame(columns = [ 'id', 'filename', 'rawdata', 'spacydata', 'spacy_to_bert_position', 'seq', 'seq_bert', 'seqlen', 'seqlen_bert', 'seq_recon', 'pseq', 'pseq_rev', 'label', 'labelid' ])
     self.tensor_cache = [] if cache_device_tensors else None
 
   def process_sample(self, text):
@@ -142,13 +145,19 @@ class LttcDataset(torch.utils.data.Dataset):
     # pad
     if not self.maxseqlen or self.maxseqlen < 0:
       self.maxseqlen = samples.seqlen.max().item()
+    if not self.maxseqlen_bert or self.maxseqlen_bert < 0:
+      self.maxseqlen_bert = samples.seqlen_bert.max().item()
     samples['seq'] = samples.seq.progress_apply(lambda s: pad(s, self.maxseqlen, self.padidx))
     samples['seqlen'] = samples.seqlen.progress_apply(lambda l: min(l, self.maxseqlen))
+    samples['seq_bert'] = samples.seq_bert.progress_apply(lambda s: pad(s, self.maxseqlen_bert, self.padidx))
+    samples['seqlen_bert'] = samples.seqlen.progress_apply(lambda l: min(l, self.maxseqlen_bert))
     samples = samples[samples.seqlen > (self.nbos + self.neos)] # filter empty samples
     # prepare positional sequences
     samples = samples.progress_apply(self.prepare_positional, axis=1)
     # reconstructed sequence for debugging purposes
     samples['seq_recon'] = samples.seq.progress_apply(lambda t: np.array(list(self.index[t.tolist()])))
+    samples['seq_recon_bert'] = samples.seq_bert.progress_apply(lambda t: self.bert_tokenizer.convert_ids_to_tokens(t.tolist()))    
+    # store data
     self.samples = pandas.concat([self.samples, samples], axis=0, sort=False, copy=False)
     if self.tensor_cache:
       self.tensor_cache = [ None ] * len(self)
@@ -164,18 +173,28 @@ class LttcDataset(torch.utils.data.Dataset):
 
   def transform_data_row(self, row):
     d = row.spacydata
-    d = self.preprocess_text(d)
-    seq = list(map(lambda t: self.index.add(t), d))
+    t = self.preprocess_text(d)
+    
     # add sentence begin and sentence end markers
     for i in range(self.nbos):
-      seq.insert(0, self.bosidx)
+      t.insert(0, '<s>')
     for i in range(max(self.neos, 1)):
-      seq.append(self.eosidx)
-    seq = torch.LongTensor(seq)
-    row['seq'] = seq
-    row['seqlen'] = seq.size(0)
+      t.append('</s>')
+      
+    # bert tokenize and map ids
+    row['spacy_to_bert_position'] = {}
+    t_bert = [ '[CLS]' ]
+    for i in range(len(t)):
+      bert_tok = self.bert_tokenizer.tokenize(t[i])
+      row['spacy_to_bert_position'][i] = list(range(len(t_bert), len(t_bert) + len(bert_tok)))
+      t_bert.extend(bert_tok)
+  
+    row['seq'] = torch.LongTensor(list(map(lambda tok: self.index.add(tok), t)))
+    row['seqlen'] = row.seq.size(0)
+    row['seq_bert'] = torch.LongTensor(self.bert_tokenizer.convert_tokens_to_ids(t_bert))
+    row['seqlen_bert'] = row.seq_bert.size(0)
     row['labelid'] = self.classindex.add(row['label'])
-    row['id'] = hash(seq)
+    row['id'] = hash(row.seq)
     return row
 
   def fixindex(self, i, wid, n):
@@ -218,19 +237,16 @@ class LttcDataset(torch.utils.data.Dataset):
     if self.tensor_cache and self.tensor_cache[index]:
       return self.tensor_cache[index]
     r = self.samples.iloc[index]
-    s  = r.seq
-    sl = r.seqlen
-    labelid = r.labelid
-    sp = r.pseq
-    sp_rev = r.pseq_rev
     tensor_dict = {
         'index': dataAsLongDeviceTensor(index, device=self.device),
         'id': dataAsLongDeviceTensor(r.id, device=self.device),
-        'seq': dataAsLongDeviceTensor(s, device=self.device),
-        'seqlen': dataAsLongDeviceTensor(sl, device=self.device),
-        'seqposi': dataAsLongDeviceTensor(sp, device=self.device),
-        'seqposi_rev': dataAsLongDeviceTensor(sp_rev, device=self.device),
-        'label': dataAsLongDeviceTensor(labelid, device=self.device)
+        'seq': dataAsLongDeviceTensor(r.seq, device=self.device),
+        'seqlen': dataAsLongDeviceTensor(r.seqlen, device=self.device),
+        'seqposi': dataAsLongDeviceTensor(r.pseq, device=self.device),
+        'seqposi_rev': dataAsLongDeviceTensor(r.pseq_rev, device=self.device),
+        'seq_bert': dataAsLongDeviceTensor(r.seq_bert, device=self.device),
+        'seqlen_bert': dataAsLongDeviceTensor(r.seqlen_bert, device=self.device),
+        'label': dataAsLongDeviceTensor(r.labelid, device=self.device)
         }
     if self.tensor_cache:
       self.tensor_cache[index] = tensor_dict
