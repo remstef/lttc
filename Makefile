@@ -16,8 +16,12 @@ install:
 	pip install -r requirements.txt
 	
 update:
-	@echo updating requirements 
+	@echo updating requirements
 	pip install -U -r requirements.txt
+
+forcedupdate:
+	@echo updating requirements
+	pip install --force-reinstall -U --upgrade-strategy eager -r requirements.txt
 
 package:
 	@echo packaging lttc
