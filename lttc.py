@@ -52,7 +52,7 @@ class LttcPipe(object):
     parser.add_argument('--wdecay', default=1.2e-6, type=float, help='weight decay applied to all weights')
     parser.add_argument('--l1reg', default=.0, type=float, help='add l1 regularuzation loss')
     parser.add_argument('--clip', default=-1, type=float, help='gradient clipping (set to -1 to avoid clipping)')
-    parser.add_argument('--batch-size', default=64, type=int, metavar='N', help='batch size')
+    parser.add_argument('--batch-size', default=16, type=int, metavar='N', help='batch size')
     parser.add_argument('--dropout', default=0.5, type=float, help='dropout applied to layers (0 = no dropout)')
     parser.add_argument('--seed', default=1111, type=int, help='random seed')
     parser.add_argument('--nlines', default=-1, type=int, metavar='N', help='number of lines to process, -1 for all')
