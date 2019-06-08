@@ -90,7 +90,8 @@ class LttcPipe(object):
                                 nlines = nlines,
                                 maxseqlen = args.maxlength,
                                 nbos = args.context_window,
-                                neos = args.context_window).load().to(self.pargs.device)
+                                neos = args.context_window,
+                                bert_model = args.bert_model).load().to(self.pargs.device)
     print('train: ' + str(trainset), file=sys.stderr)
     self.freeze_and_save_indices(args, trainset.index, trainset.posiindex, trainset.classindex)
     args.maxseqlentrain = trainset.maxseqlen
@@ -107,7 +108,8 @@ class LttcPipe(object):
                                  nbos = trainset.nbos,
                                  neos = trainset.neos,
                                  posiindex = trainset.posiindex,
-                                 classindex = trainset.classindex).load().to(self.pargs.device)
+                                 classindex = trainset.classindex,
+                                 bert_model = trainset.bert_tokenizer).load().to(self.pargs.device)
     print('test: ' + str(testset), file=sys.stderr)
 
     self.pargs.trainset = trainset
