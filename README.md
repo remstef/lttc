@@ -4,7 +4,7 @@
  _Note: Documentation is in progress_
 
 ### Installing:
-- Run `make install` and check `install.log`
+- Run `make install`
 - Run `make embedding`, you will be prompted for download
 
 ### Basics:

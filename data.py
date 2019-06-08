@@ -18,14 +18,17 @@ import sklearn.metrics
 tqdm.pandas(ncols=89)
 spacynlps = {}
 
-def importSpacy(lang='en'):
+def importSpacy(lang='en', spacymodeldesc=None):
+  if spacymodeldesc:
+    import importlib
+    spacymodel = importlib.import_module(spacymodeldesc)
+    return spacymodel
   if lang == 'de':
-    import de_core_news_sm as spacymodel
+    return importSpacy(spacymodeldesc='de_core_news_sm')
   elif lang == 'fr':
-    import fr_core_news_sm as spacymodel
-  else: ## use 'en'
-    import en_core_web_sm as spacymodel
-  return spacymodel
+    return importSpacy(spacymodeldesc='fr_core_news_sm')
+  # else: ## use 'en'
+  return importSpacy(spacymodeldesc='en_core_web_sm')
 
 def getSpacyNLP(spacymodel):
   global spacynlps
