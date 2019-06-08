@@ -4,8 +4,10 @@
 @author: Steffen Remus (@remstef)
 '''
 
+import sys
 import math
 import torch
+from pytorch_pretrained_bert import BertModel
 from utils import RequiredParam, merge_context
 
 ##
@@ -120,3 +122,69 @@ class ConvKim(torch.nn.Module):
     logprobs = self.softmax(y)
 
     return logprobs, 0
+
+
+
+class BertSeqFT(torch.nn.Module):
+
+  def __init__(self,
+               *args,
+               bert_model = RequiredParam,
+               nclasses = RequiredParam,
+               testswitch=False,
+               **kwargs):
+
+    super(BertSeqFT, self).__init__()
+
+    RequiredParam.check(locals(), self.__class__.__name__)
+    
+    print(f"Loading bert model '{bert_model}'.", file=sys.stderr)
+    self.bertmodel = BertModel.from_pretrained(bert_model)
+    self.bertmodel_size = 768
+    self.linear = torch.nn.Linear(self.bertmodel_size, nclasses)
+    self.softmax = torch.nn.LogSoftmax(dim=1)
+
+  def forward(self, *args, seq_bert=RequiredParam, **kwargs):
+    # seq_bert = batch_size x max_seq_length (padded) : sentence
+    (batch_size, seqlen) = seq_bert.size()
+    
+    segments = torch.zeros((batch_size, seqlen)).long().to(seq_bert.device)    
+    s, _ = self.bertmodel(seq_bert, segments, output_all_encoded_layers=False)
+    s = s[:,0,:].view(batch_size, -1)
+    o = self.softmax(self.linear(s))
+    
+    return o, 0
+  
+  
+
+class BertSeqNoFT(torch.nn.Module):
+
+  def __init__(self,
+               *args,
+               bert_model = RequiredParam,
+               nclasses = RequiredParam,
+               testswitch=False,
+               **kwargs):
+
+    super(BertSeqNoFT, self).__init__()
+
+    RequiredParam.check(locals(), self.__class__.__name__)
+    
+    print(f"Loading bert model '{bert_model}'.", file=sys.stderr)
+    self.bertmodel = BertModel.from_pretrained(bert_model)
+    self.bertmodel.eval()
+    self.bertmodel_size = 768
+    self.linear = torch.nn.Linear(self.bertmodel_size, nclasses)
+    self.softmax = torch.nn.LogSoftmax(dim=1)
+
+  def forward(self, *args, seq_bert=RequiredParam, **kwargs):
+    # seq_bert = batch_size x max_seq_length (padded) : sentence
+    (batch_size, seqlen) = seq_bert.size()
+    
+    segments = torch.zeros((batch_size, seqlen)).long().to(seq_bert.device)
+    with torch.no_grad():
+      s, _ = self.bertmodel(seq_bert, segments, output_all_encoded_layers=False)
+    s = s[:,0,:].view(batch_size, -1)
+    o = self.softmax(self.linear(s))
+    
+    return o, 0

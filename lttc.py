@@ -27,12 +27,14 @@ class LttcPipe(object):
 
   def prepareSystemArgs(self):
     parser = argparse.ArgumentParser(description='Text classification', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--module', default='ConvKim', type=str, help='Module which should be used for training or testing [ ConvKim (default), ... ].')
     parser.add_argument('--model', default='./savedmodels/model', type=str, help='path to save the final model')
     parser.add_argument('--lang', type=str, default='en', help="Language. Currently supported: en (default), de, fr.")
     parser.add_argument('--serve', action='store_true', help='use this switch to load and serve a model.')
     parser.add_argument('--server', type=str, default='127.0.0.1:8881', help='Serve model on HOST:PORT (default=127.0.0.1:8881). Only used if --serve is activated.')
     parser.add_argument('--train', type=str, default='./data/SMSSpamCollection/train', help="dataset location which should be used for training (e.g. './data/SMSSpamCollection' for full data or './data/SMSSpamCollection/train' for training data only).")
     parser.add_argument('--test', type=str, default='./data/SMSSpamCollection/test', help="dataset location which should be used for testing (e.g. './data/SMSSpamCollection/test'). Can be omitted for training, testing will then be performed on the training data.")
+    parser.add_argument('--bert-model', default='bert-base-uncased', type=str, help='Bert pre-trained model that is also used for wordpiece tokenization.')
     parser.add_argument('--epochs', default=100, type=int, help='upper epoch limit')
     parser.add_argument('--optim', default='SGD', type=str, help='type of optimizer (SGD, Adam, Adagrad, ASGD, SimpleSGD)')
     parser.add_argument('--loss', default='NLLLoss', type=str, help='type of loss function to use (NLLLoss, CrossEntropyLoss, MarginLoss, SpreadLoss)')
@@ -169,7 +171,9 @@ class LttcPipe(object):
     if self.pargs.has('modelclass'):
       modelclass__ = self.pargs.modelclass
     else:
-      modelclass__ = modules.ConvKim
+      if not hasattr(modules, args.module):
+        raise ValueError( f"Unknown module '{args.module}'.")
+      modelclass__ = getattr(modules, args.module)
       self.pargs.modelclass = modelclass__
 
     model = modelclass__(**args.__dict__, **self.pargs.__dict__)
