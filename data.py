@@ -42,7 +42,7 @@ def getSpacyNLP(spacymodel):
 '''
 class LttcDataset(torch.utils.data.Dataset):
 
-  def __init__(self, path=None, lang='en', nlines=None, maxseqlen=None, index = None, nbos = 0, neos = 1, posiindex = None, classindex = None):
+  def __init__(self, path=None, lang='en', nlines=None, maxseqlen=None, index = None, nbos = 0, neos = 1, posiindex = None, classindex = None, bert_model = 'bert-base-uncased', maxseqlen_bert=None, cache_device_tensors=True):
     super(LttcDataset, self).__init__()
     self.path = path
     self.maxseqlen = maxseqlen
@@ -61,6 +61,7 @@ class LttcDataset(torch.utils.data.Dataset):
     self.lang = lang
     self.spacy_model = importSpacy(self.lang)
     self.samples = pandas.DataFrame(columns = [ 'id', 'filename', 'rawdata', 'spacydata', 'seq', 'seqlen', 'seq_recon', 'pseq', 'pseq_rev', 'label', 'labelid' ])
+    self.tensor_cache = [] if cache_device_tensors else None
 
   def process_sample(self, text):
     rawdata = text.strip()
@@ -149,6 +150,8 @@ class LttcDataset(torch.utils.data.Dataset):
     # reconstructed sequence for debugging purposes
     samples['seq_recon'] = samples.seq.progress_apply(lambda t: np.array(list(self.index[t.tolist()])))
     self.samples = pandas.concat([self.samples, samples], axis=0, sort=False, copy=False)
+    if self.tensor_cache:
+      self.tensor_cache = [ None ] * len(self)
     return self
 
   def preprocess_text(self, spacydoc):
@@ -212,6 +215,8 @@ class LttcDataset(torch.utils.data.Dataset):
     return self.samples.shape[0]
 
   def __getitem__(self, index):
+    if self.tensor_cache and self.tensor_cache[index]:
+      return self.tensor_cache[index]
     r = self.samples.iloc[index]
     s  = r.seq
     sl = r.seqlen
@@ -227,6 +232,8 @@ class LttcDataset(torch.utils.data.Dataset):
         'seqposi_rev': dataAsLongDeviceTensor(sp_rev, device=self.device),
         'label': dataAsLongDeviceTensor(labelid, device=self.device)
         }
+    if self.tensor_cache:
+      self.tensor_cache[index] = tensor_dict
     return tensor_dict
       
 
