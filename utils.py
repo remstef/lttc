@@ -8,6 +8,7 @@ import sys, os
 import random
 import pickle
 import yaml
+import math
 import torch.utils.data
 
 
@@ -31,10 +32,17 @@ class AttributeHolder(object):
       return None
     return getattr(self, key)
   def dump(self, dest=None):
+    if isinstance(dest, str):
+      with open(dest, 'wt') as f:
+        return yaml.dump(self.__dict__, f)
     return yaml.dump(self.__dict__, dest)
-  def load(self, src):
-    d = yaml.load(src)
-    [ self.__setitem__(k,v) for k,v in d.items() ]
+  def load(self, src, keep=[]):
+    if isinstance(src, str):
+      with open(src, 'rt') as f:
+        d = yaml.load(f, Loader=yaml.FullLoader)
+    else:
+      d = yaml.load(src, Loader=yaml.FullLoader)
+    [ self.__setitem__(k,v) for k,v in d.items() if k not in keep ]
     return self
   def has(self, key):
     if hasattr(self, key):
@@ -95,6 +103,10 @@ class Index(object):
   def freeze(self, silent = False):
     self.frozen = True
     self.silentlyfrozen = silent
+    return self
+  
+  def unfreeze(self):
+    self.frozen = False
     return self
 
   def vocabulary(self):
@@ -274,6 +286,12 @@ class EvenlyDistributingSampler(torch.utils.data.sampler.BatchSampler):
 
     for row_as_batch in data:
       yield row_as_batch.tolist()
+      
+      
+class GELU(torch.nn.Module):
+  piroot = math.sqrt(2 / math.pi)
+  def forward(self, x):
+    return 0.5 * x * (1 + torch.tanh(self.piroot * (x + .044715 * torch.pow(x, 3))))
 
 
 class SimpleSGD(torch.optim.Optimizer):
@@ -421,6 +439,20 @@ def merge_context(seq, s):
   '''
   n = s*2+1
   return torch.cat([seq[:,i:seq.size(1)-(n-i-1),:] for i in range(n)],dim=2)
+
+
+def dataAsLongDeviceTensor(data, device):
+  if isinstance(data, torch.LongTensor):
+    return data.to(device)
+  if isinstance(data, torch.Tensor):
+    return data.long().to(device)
+  return torch.tensor(data, dtype=torch.long, device=device)
+
+
+def chain(*iterables): 
+  for iterable in iterables: 
+    yield from iterable
+
 
 def create_tcp_server(HOST='127.0.0.1', PORT=8881, linehandler=lambda l: l):
 

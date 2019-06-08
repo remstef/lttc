@@ -8,7 +8,6 @@
 import argparse
 import time
 import os, sys
-import yaml
 import math
 from tqdm import tqdm
 import torch
@@ -191,21 +190,14 @@ class LttcPipe(object):
     optimizer = utils.createWrappedOptimizerClass(Optimizer__)(model.parameters(), lr =args.lr, clip=args.clip, weight_decay=args.wdecay)
 
     # processing function
-    def process(batch_data):
-      # unpack data that was already prepared (batch_first_dim)
-      ith_sample, sample_id, \
-      seq, seqlen, seqbow, \
-      seqposi, seqposi_rev, \
-      label, \
-      trainflag = batch_data
-
-      targets = label
-      outputs, labelweights = model(seq, seqlen, seqbow, seqposi, seqposi_rev)
+    def process(batch_data, istraining):
+      targets = batch_data['label']
+      outputs, labelweights = model(**batch_data)
 
       loss = criterion(outputs, targets)
 
       predictions = self.getpredictions(outputs.data)
-      return loss, (sample_id, outputs, predictions, targets)
+      return loss, (batch_data['id'], outputs, predictions, targets)
 
     print(model, file=sys.stderr)
     print(criterion, file=sys.stderr)
@@ -335,7 +327,7 @@ class LttcPipe(object):
 
       with torch.no_grad():
         for batch_i, batch_data in enumerate(tqdm(dloader, ncols=89, desc = 'Test ')):
-          loss, (sampleids, outputs, predictions_, targets_) = process(batch_data + [ False ])
+          loss, (sampleids, outputs, predictions_, targets_) = process(batch_data, False)
           if args.l1reg > 0:
             reg_loss = l1reg(model)
             loss += args.l1reg * reg_loss
@@ -375,7 +367,7 @@ class LttcPipe(object):
       for batch_i, batch_data in enumerate(tqdm(self.pargs.trainloader, ncols=89, desc='Train')):
         batch_start_time = time.time()
         model.zero_grad()
-        loss, (_, outputs, batch_predictions, batch_targets) = process(batch_data + [ True ])
+        loss, (_, outputs, batch_predictions, batch_targets) = process(batch_data, True)
         if args.l1reg > 0:
           reg_loss = l1reg(model)
           loss += args.l1reg * reg_loss
@@ -482,14 +474,10 @@ class LttcPipe(object):
       if not tensors:
         return f"EMPTY OR INVALID INPUT: {text.encode('utf-8')}"
       # add batch dimension
-      tensors = [ t.unsqueeze_(0) for t in tensors ]
+      for t in tensors.values():
+        t.unsqueeze_(0)
 
-      ith_sample, sample_id, \
-      seq, seqlen, seqbow, \
-      seqposi, seqposi_rev, \
-      _ = tensors
-
-      outputs, _ = self.pargs.model(seq, seqlen, seqbow, seqposi, seqposi_rev)
+      outputs, _ = self.pargs.model(**tensors)
       predictions = self.getpredictions(outputs.data)
 
       # remove batch dimension by using only first entry

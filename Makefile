@@ -7,14 +7,13 @@ SHELL:=/bin/bash
 all: install embedding
 
 clean:
-	rm -f install.log
 	rm -f embedding/*.zip
 	rm -f embedding/*.gz
 	
 install: 
 	@echo installing requirements 
-	pip install cython &> install.log
-	pip install -r requirements.txt >> install.log 2>&1 
+	pip install cython
+	pip install -r requirements.txt
 	
 update:
 	@echo updating requirements 

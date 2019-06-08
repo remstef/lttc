@@ -11,7 +11,7 @@ import pandas
 import torch
 import torch.utils
 import torch.utils.data
-from utils import Index, AttributeHolder, pad, pickle_read_large, pickle_dump_large
+from utils import Index, AttributeHolder, pad, pickle_read_large, pickle_dump_large, dataAsLongDeviceTensor
 import sklearn.datasets
 import sklearn.metrics
 
@@ -55,10 +55,9 @@ class LttcDataset(torch.utils.data.Dataset):
     self.posiindex = posiindex if posiindex is not None else Index()
     self.nlines = nlines
     self.device = torch.device('cpu')
-    self.deviceTensor = torch.LongTensor().to(self.device) # create tensor on device, which can be used for copying
     self.lang = lang
     self.spacy_model = importSpacy(self.lang)
-    self.samples = pandas.DataFrame(columns = [ 'id', 'filename', 'rawdata', 'spacydata', 'seqbow', 'seq', 'seqlen', 'seq_recon', 'pseq', 'pseq_rev', 'label', 'labelid' ])
+    self.samples = pandas.DataFrame(columns = [ 'id', 'filename', 'rawdata', 'spacydata', 'seq', 'seqlen', 'seq_recon', 'pseq', 'pseq_rev', 'label', 'labelid' ])
 
   def process_sample(self, text):
     rawdata = text.strip()
@@ -70,7 +69,6 @@ class LttcDataset(torch.utils.data.Dataset):
     # process
     #df = df.progress_apply(self.transform_data_row, axis=1)
     df = df.apply(self.transform_data_row, axis=1)
-    df['seqbow'] = df.seq.apply(lambda s: s.new_zeros(len(self.index)).scatter(dim=0, index=s[self.nbos:s.size(0)-self.neos], value=1)) # create bag of word representation w/o bos and eos
     # pad
     df['seq'] = df.seq.apply(lambda s: pad(s, self.maxseqlen, self.padidx))
     df['seqlen'] = df.seqlen.apply(lambda l: min(l, self.maxseqlen))
@@ -97,7 +95,6 @@ class LttcDataset(torch.utils.data.Dataset):
       samples = pandas.DataFrame(columns = ['filename', 'label', 'rawdata'])
       # do some preprocessing if preprocessed file does not exist
       tqdm.write(f'Loading data from {filename}...', file=sys.stderr)
-
       label = os.path.basename(os.path.dirname(filename))
       tqdm.write(f"Reading '{filename}'", file=sys.stderr)
       with open(filename, 'r', encoding='utf-8') as f:
@@ -138,7 +135,6 @@ class LttcDataset(torch.utils.data.Dataset):
 
     tqdm.write('Preparing data...', file=sys.stderr)
     samples = samples.progress_apply(self.transform_data_row, axis=1)
-    samples['seqbow'] = samples.seq.apply(lambda s: s.new_zeros(len(self.index)).scatter(dim=0, index=s[self.nbos:s.size(0)-self.neos], value=1)) # create bag of word representation w/o bos and eos
     # pad
     if not self.maxseqlen or self.maxseqlen < 0:
       self.maxseqlen = samples.seqlen.max().item()
@@ -216,16 +212,20 @@ class LttcDataset(torch.utils.data.Dataset):
     r = self.samples.iloc[index]
     s  = r.seq
     sl = r.seqlen
-    sb = r.seqbow
     labelid = r.labelid
     sp = r.pseq
     sp_rev = r.pseq_rev
-    d = self.deviceTensor
-    return \
-      d.new_tensor(index), d.new_tensor(r.id), \
-      d.new_tensor(s), d.new_tensor(sl), d.new_tensor(sb), \
-      d.new_tensor(sp), d.new_tensor(sp_rev), \
-      d.new_tensor(labelid)
+    tensor_dict = {
+        'index': dataAsLongDeviceTensor(index, device=self.device),
+        'id': dataAsLongDeviceTensor(r.id, device=self.device),
+        'seq': dataAsLongDeviceTensor(s, device=self.device),
+        'seqlen': dataAsLongDeviceTensor(sl, device=self.device),
+        'seqposi': dataAsLongDeviceTensor(sp, device=self.device),
+        'seqposi_rev': dataAsLongDeviceTensor(sp_rev, device=self.device),
+        'label': dataAsLongDeviceTensor(labelid, device=self.device)
+        }
+    return tensor_dict
+      
 
   def compute_scores(self, true_label_ids, predicted_label_ids, *args, **kwargs):
     # standard scores
@@ -246,9 +246,8 @@ class LttcDataset(torch.utils.data.Dataset):
     return self.to(torch.device('cuda'))
 
   def to(self, device):
-    print(f"{self.__class__.__name__:s}: Sending new tensors to `{device}`.", file=sys.stderr)
+    print(f"{self.__class__.__name__:s}: Sending new tensors to '{device}'.", file=sys.stderr)
     self.device = device
-    self.deviceTensor = self.deviceTensor.to(device)
     return self
 
   def __repr__(self):

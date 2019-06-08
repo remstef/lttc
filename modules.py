@@ -85,7 +85,7 @@ class ConvKim(torch.nn.Module):
       self.word_embeddings.weight.requires_grad = False
     self.posi_embeddings.weight.data.uniform_(-initrange, initrange)
 
-  def forward(self, seq, seqlen, seqbow, seqposi, seqposi_rev, *args, **kwargs):
+  def forward(self, *args, seq=RequiredParam, seqlen=RequiredParam, seqposi=RequiredParam, seqposi_rev=RequiredParam, **kwargs):
 
     # seq = batch_size x max_seq_length (padded) : sentence
     # seqlen = batch_size x seq_length
