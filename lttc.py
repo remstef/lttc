@@ -363,7 +363,7 @@ class LttcPipe(object):
 
     # save the parameters and the status message
     args.modelepoch = epoch
-    args.dump(f, dest=os.path.join(args.model, f'parameters{suffix}.yml'))
+    args.dump(dest=os.path.join(args.model, f'parameters{suffix}.yml'))
     with open(os.path.join(args.model, f'status{suffix}.txt'), 'wt') as f:
       m = '\n'.join(filter(lambda l: len(l) > 1, map(lambda l: l.strip(), message.split('\n'))))
       print(m, file=f)
