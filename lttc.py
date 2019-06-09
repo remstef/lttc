@@ -330,6 +330,19 @@ class LttcPipe(object):
         testscoreline.replace('\n', '\n' + ' '*25),
         bestbeforeline,
         '=' * 88)
+  
+  
+  def message_status_endeval(self, test_scores):
+    testscoreline  = test_scores.string
+    return '''\
+  |
+  |{:s}
+  |   +-- Scores (eval) {:s}
+  |{:s}\
+  '''.format(
+        '=' * 88,
+        testscoreline.replace('\n',  '\n  |' + ' '*21),
+        '=' * 88)
 
 
   def freeze_and_save_indices(self, args, wordindex, positionindex, classindex):
@@ -340,18 +353,20 @@ class LttcPipe(object):
     classindex.freeze(silent = False).tofile(os.path.join(args.model, 'ndx_classes.txt'))
 
 
-  def savemodel(self, args, epoch):
+  def savemodel(self, args, epoch, message='', suffix='-final'):
     # make sure the directory exists
     os.makedirs(args.model, exist_ok=True)
 
     # save the NN model
-    with open(os.path.join(args.model, 'model.pt'), 'wb') as f:
+    with open(os.path.join(args.model, f'model{suffix}.pt'), 'wb') as f:
       torch.save(self.pargs.modelinstance, f)
 
-    # save the parameters
+    # save the parameters and the status message
     args.modelepoch = epoch
-    with open(os.path.join(args.model, 'parameters.yml'), 'wt') as f:
-      args.dump(f)
+    args.dump(f, dest=os.path.join(args.model, f'parameters{suffix}.yml'))
+    with open(os.path.join(args.model, f'status{suffix}.txt'), 'wt') as f:
+      m = '\n'.join(filter(lambda l: len(l) > 1, map(lambda l: l.strip(), message.split('\n'))))
+      print(m, file=f)
 
   def savepredictions(self, args, ids, logprobs, predictions, targets, scores):
     outfile = os.path.join(args.model, 'model.predictions.tsv')
