@@ -8,6 +8,7 @@
 import argparse
 import time
 import os, sys
+import copy
 import math
 from tqdm import tqdm
 import torch
@@ -26,53 +27,78 @@ class LttcPipe(object):
     self.pargs = utils.AttributeHolder()
 
   def prepareSystemArgs(self):
+    
+    class StoreAction(argparse._StoreAction):
+      def __call__(self, parser, namespace, values, option_string=None):
+        super(StoreAction, self).__call__(parser, namespace, values, option_string)
+        setattr(namespace, '_explicit_', getattr(namespace, '_explicit_', [ '_explicit_' ]) + [ self.dest ])
+
+    class StoreTrueAction(argparse._StoreTrueAction):
+      def __call__(self, parser, namespace, values, option_string=None):
+        super(StoreTrueAction, self).__call__(parser, namespace, values, option_string)
+        setattr(namespace, '_explicit_', getattr(namespace, '_explicit_', [ '_explicit_' ]) + [ self.dest ])
+    
     parser = argparse.ArgumentParser(description='Text classification', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--module', default='ConvKim', type=str, help='Module which should be used for training or testing [ ConvKim (default), ... ].')
-    parser.add_argument('--model', default='./savedmodels/model', type=str, help='path to save the final model')
-    parser.add_argument('--lang', type=str, default='en', help="Language. Currently supported: en (default), de, fr.")
-    parser.add_argument('--serve', action='store_true', help='use this switch to load and serve a model.')
-    parser.add_argument('--server', type=str, default='127.0.0.1:8881', help='Serve model on HOST:PORT (default=127.0.0.1:8881). Only used if --serve is activated.')
-    parser.add_argument('--train', type=str, default='./data/SMSSpamCollection/train', help="dataset location which should be used for training (e.g. './data/SMSSpamCollection' for full data or './data/SMSSpamCollection/train' for training data only).")
-    parser.add_argument('--test', type=str, default='./data/SMSSpamCollection/test', help="dataset location which should be used for testing (e.g. './data/SMSSpamCollection/test'). Can be omitted for training, testing will then be performed on the training data.")
-    parser.add_argument('--bert-model', default='bert-base-uncased', type=str, help='Bert pre-trained model that is also used for wordpiece tokenization.')
-    parser.add_argument('--epochs', default=100, type=int, help='upper epoch limit')
-    parser.add_argument('--optim', default='SGD', type=str, help='type of optimizer (SGD, Adam, Adagrad, ASGD, SimpleSGD)')
-    parser.add_argument('--loss', default='NLLLoss', type=str, help='type of loss function to use (NLLLoss, CrossEntropyLoss, MarginLoss, SpreadLoss)')
-    parser.add_argument('--emsize-word', default=300, type=int, help='size of word embeddings')
-    parser.add_argument('--emsize-posi', default=5, type=int, help='size of the position embeddings')
-    parser.add_argument('--maxlength', default=-1, type=int, help='maximum length of a sequence (use -1 for determining the length from the training data)')
-    parser.add_argument('--context-window', default=0, type=int, help='size of the moving window of left and right contexts for concatenatation')
-    parser.add_argument('--convfilters', default='1024,1024,1024', type=str, help='number of convolution filters to apply')
-    parser.add_argument('--convwindows', default='3,4,5', type=str, help='sizes of the moving convolutional window')
-    parser.add_argument('--convstrides', default='1,1,1', type=str, help='strides of convolutions')
-    parser.add_argument('--conv-activation', default='ReLU', type=str, help='activation function to use after convolutinal layer (ReLU, Tanh)')
-    parser.add_argument('--nhid', default=200, type=int, help='size of hidden layer')
-    parser.add_argument('--lr', default=.1, type=float, help='initial learning rate')
-    parser.add_argument('--lr-decay', default=0.25, type=float, help='decay amount of learning learning rate if no validation improvement occurs')
-    parser.add_argument('--wdecay', default=1.2e-6, type=float, help='weight decay applied to all weights')
-    parser.add_argument('--l1reg', default=.0, type=float, help='add l1 regularuzation loss')
-    parser.add_argument('--clip', default=-1, type=float, help='gradient clipping (set to -1 to avoid clipping)')
-    parser.add_argument('--batch-size', default=16, type=int, metavar='N', help='batch size')
-    parser.add_argument('--dropout', default=0.5, type=float, help='dropout applied to layers (0 = no dropout)')
-    parser.add_argument('--seed', default=1111, type=int, help='random seed')
-    parser.add_argument('--nlines', default=-1, type=int, metavar='N', help='number of lines to process, -1 for all')
-    parser.add_argument('--status-reports', default=3, type=int, metavar='N', help='generate N reports during one training epoch (N=min(N, nbatches))')
-    parser.add_argument('--init-emword', default='', type=str, help='path to initial word embedding; emsize-word must match size of embedding')
-    parser.add_argument('--fix-emword', action='store_true', help='Specify if the word embedding should be excluded from further training')
-    parser.add_argument('--shuffle-samples', action='store_true', help='shuffle samples')
-    parser.add_argument('--shuffle-batches', action='store_true', help='shuffle batches')
-    parser.add_argument('--cuda', action='store_true', help='use CUDA')
-    #parser.add_argument('--testswitch', action='store_true', help='some test switch for quick code debugging')
+    parser.add_argument('--train', type=str, default='./data/SMSSpamCollection/train', help="dataset location which should be used for training (e.g. './data/SMSSpamCollection' for full data or './data/SMSSpamCollection/train' for training data only).", action=StoreAction)
+    parser.add_argument('--test', type=str, default='./data/SMSSpamCollection/test', help="dataset location which should be used for testing (e.g. './data/SMSSpamCollection/test'). Can be omitted for training, testing will then be performed on the training data.", action=StoreAction)
+    parser.add_argument('--configs', type=str, nargs='*', help='Run multiple configs. One config is the path to a configuration in yaml format to use.', action=StoreAction)
+    parser.add_argument('--module', default='ConvKim', type=str, help='Module which should be used for training or testing [ ConvKim (default), ... ].', action=StoreAction)
+    parser.add_argument('--model', default='./savedmodels/model', type=str, help='path to save the final model', action=StoreAction)
+    parser.add_argument('--lang', type=str, default='en', help="Language. Currently supported: en (default), de, fr.", action=StoreAction)
+    parser.add_argument('--serve', help='use this switch to load and serve a model.', action=StoreTrueAction)
+    parser.add_argument('--server', type=str, default='127.0.0.1:8881', help='Serve model on HOST:PORT (default=127.0.0.1:8881). Only used if --serve is activated.', action=StoreAction)
+    parser.add_argument('--bert-model', default='bert-base-uncased', type=str, help='Bert pre-trained model that is also used for wordpiece tokenization.', action=StoreAction)
+    parser.add_argument('--epochs', default=100, type=int, help='upper epoch limit', action=StoreAction)
+    parser.add_argument('--optim', default='SGD', type=str, help='type of optimizer (SGD, Adam, Adagrad, ASGD, SimpleSGD)', action=StoreAction)
+    parser.add_argument('--loss', default='NLLLoss', type=str, help='type of loss function to use (NLLLoss, CrossEntropyLoss, MarginLoss, SpreadLoss)', action=StoreAction)
+    parser.add_argument('--emsize-word', default=300, type=int, help='size of word embeddings', action=StoreAction)
+    parser.add_argument('--emsize-posi', default=5, type=int, help='size of the position embeddings', action=StoreAction)
+    parser.add_argument('--maxlength', default=-1, type=int, help='maximum length of a sequence (use -1 for determining the length from the training data)', action=StoreAction)
+    parser.add_argument('--context-window', default=0, type=int, help='size of the moving window of left and right contexts for concatenatation', action=StoreAction)
+    parser.add_argument('--convfilters', default=[1024,1024,1024], type=int, nargs='*', help='number of convolution filters to apply', action=StoreAction)
+    parser.add_argument('--convwindows', default=[3,4,5], type=int, nargs='*', help='sizes of the moving convolutional window', action=StoreAction)
+    parser.add_argument('--convstrides', default=[1,1,1], type=int, nargs='*', help='strides of convolutions', action=StoreAction)
+    parser.add_argument('--conv-activation', default='ReLU', type=str, help='activation function to use after convolutinal layer (ReLU, Tanh)', action=StoreAction)
+    parser.add_argument('--nhid', default=200, type=int, help='size of hidden layer', action=StoreAction)
+    parser.add_argument('--lr', default=.1, type=float, help='initial learning rate', action=StoreAction)
+    parser.add_argument('--lr-decay', default=0.25, type=float, help='decay amount of learning learning rate if no validation improvement occurs', action=StoreAction)
+    parser.add_argument('--wdecay', default=1.2e-6, type=float, help='weight decay applied to all weights', action=StoreAction)
+    parser.add_argument('--l1reg', default=.0, type=float, help='add l1 regularuzation loss', action=StoreAction)
+    parser.add_argument('--clip', default=-1, type=float, help='gradient clipping (set to -1 to avoid clipping)', action=StoreAction)
+    parser.add_argument('--batch-size', default=16, type=int, metavar='N', help='batch size', action=StoreAction)
+    parser.add_argument('--dropout', default=0.5, type=float, help='dropout applied to layers (0 = no dropout)', action=StoreAction)
+    parser.add_argument('--seed', default=1111, type=int, help='random seed', action=StoreAction)
+    parser.add_argument('--nlines', default=-1, type=int, metavar='N', help='number of lines to process, -1 for all', action=StoreAction)
+    parser.add_argument('--status-reports', default=3, type=int, metavar='N', help='generate N reports during one training epoch (N=min(N, nbatches))', action=StoreAction)
+    parser.add_argument('--init-emword', default='', type=str, help='path to initial word embedding; emsize-word will be overwritten with the size of the embedding.', action=StoreAction)
+    parser.add_argument('--fix-emword', help='Specify if the word embedding should be excluded from further training', action=StoreTrueAction)
+    parser.add_argument('--shuffle-samples', help='shuffle samples', action=StoreTrueAction)
+    parser.add_argument('--shuffle-batches', help='shuffle batches', action=StoreTrueAction)
+    parser.add_argument('--cuda', help='use CUDA', action=StoreTrueAction)
+    # parser.add_argument('--testswitch', help='some test switch for quick code debugging', action=StoreTrueAction)
     return parser
 
   def parseSystemArgs(self):
     parser = self.prepareSystemArgs()
     args = utils.AttributeHolder(**parser.parse_args().__dict__)
-    args.convfilters = [ int(x) for x in filter(lambda x: x, map(lambda x: x.strip(), args.convfilters.strip(' ,').split(','))) ]
-    args.convwindows = [ int(x) for x in filter(lambda x: x, map(lambda x: x.strip(), args.convwindows.strip(' ,').split(','))) ]
-    args.convstrides = [ int(x) for x in filter(lambda x: x, map(lambda x: x.strip(), args.convstrides.strip(' ,').split(','))) ]
     return args
-
+  
+  def parseArgsFromConfigfile(self, currentargs, fname, keep):
+    try:
+      currentargs.load(fname, keep=currentargs._explicit_) # read and overwrite args with args from config
+    except FileNotFoundError:
+      print(f'File {fname} does not exist!', file=sys.stderr)
+      return None
+    currentargs.configval=fname
+    # make args with path information relative to the path in that the configuration was found
+    if not 'model' in currentargs._explicit_:
+      currentargs.modelval=currentargs.model
+      currentargs.model=os.path.join(os.path.dirname(fname), currentargs.model)
+    if not 'init_emword' in currentargs._explicit_ and currentargs.init_emword and currentargs.init_emword.startswith('.'):
+      currentargs.init_emwordval=currentargs.init_emword
+      currentargs.init_emword=os.path.join(os.path.dirname(fname), currentargs.init_emword)
+    return currentargs
+  
   def prepareCuda(self, args):
     # Set the random seed manually for reproducibility.
     torch.manual_seed(args.seed)
@@ -83,8 +109,19 @@ class LttcPipe(object):
     return args
 
   def loadDatasets(self, args):
-    nlines = None if args.nlines <= 0 else args.nlines
+    
+    def updateArgsFromTrainingData(trainset):
+      args.maxseqlentrain = trainset.maxseqlen
+      args.nbostrain = trainset.nbos
+      args.neostrain = trainset.neos
+      args.maxseqlen_berttrain = trainset.maxseqlen_bert
 
+    # if already set, don't load it again, but only if the pretrained embedding still matches
+    if self.pargs.has('trainset') and self.pargs.trainset.path == args.train and self.pargs.has('emweights_word_name') and self.pargs.emweights_word_name == args.init_emword:
+      updateArgsFromTrainingData(self.pargs.trainset)
+      return
+    
+    nlines = None if args.nlines <= 0 else args.nlines
     trainset = data.LttcDataset(path = args.train,
                                 lang = args.lang,
                                 nlines = nlines,
@@ -93,10 +130,12 @@ class LttcPipe(object):
                                 neos = args.context_window,
                                 bert_model = args.bert_model).load().to(self.pargs.device)
     print('train: ' + str(trainset), file=sys.stderr)
+
     self.freeze_and_save_indices(args, trainset.index, trainset.posiindex, trainset.classindex)
-    args.maxseqlentrain = trainset.maxseqlen
-    args.nbostrain = trainset.nbos
-    args.neostrain = trainset.neos
+    if args.init_emword: # if a pretrained embedding is used, e.g. Bert or fasttext, then add also test set words to the index (and thus embedding)
+      trainset.index.unfreeze()
+
+    updateArgsFromTrainingData(trainset)
 
     testset = None
     if args.test:
@@ -111,6 +150,9 @@ class LttcPipe(object):
                                  classindex = trainset.classindex,
                                  bert_model = trainset.bert_tokenizer).load().to(self.pargs.device)
     print('test: ' + str(testset), file=sys.stderr)
+    
+    if not trainset.index.frozen: # if a pretrained embedding is used
+      self.freeze_and_save_indices(args, trainset.index)
 
     self.pargs.trainset = trainset
     self.pargs.testset = testset
@@ -123,28 +165,33 @@ class LttcPipe(object):
     self.pargs.ntoken = len(trainset.index)
     self.pargs.npositions = len(trainset.posiindex)
     self.pargs.nclasses = len(self.pargs.classindex)
-    return args
+
 
 
   def loadaddlData(self, args):
     preemb_weights = None
     # load pre embedding
     if args.init_emword:
+      if self.pargs.has('emweights_word') and self.pargs.has('emweights_word_name') and self.pargs.emweights_word_name == args.init_emword:
+        args.emsize_word = self.pargs.emweights_word.size(1)
+        return
       # determine type of embedding by checking it's suffix
       if args.init_emword.endswith('bin'):
         preemb = embedding.FastTextEmbedding(args.init_emword, normalize = True).load()
-        if args.emsize_word != preemb.dim():
-          raise ValueError(f'emsize-word must match embedding size. Expected {args.emsize_word:d} but got {preemb.dim():d}')
+      elif args.init_emword.startswith('bert-'):
+        preemb = embedding.BertEmbedding(args.init_emword, normalize = True).load()
       elif args.init_emword.endswith('txt'):
-        preemb = embedding.TextEmbedding(args.init_emword, vectordim = args.emsize_word).load(normalize = True)
+        preemb = embedding.TextEmbedding(args.init_emword, vectordim = 300).load(normalize = True, skipheader=True) # TODO: this works for google word2vec embeddings in text format but not for arbitrary text embeddings (skipheader & dimension)
       elif args.init_emword.endswith('rand'):
         preemb = embedding.RandomEmbedding(vectordim = args.emsize_word)
       else:
         raise ValueError('Type of embedding cannot be inferred.')
       preemb = embedding.Embedding.filteredEmbedding(self.pargs.trainset.index.vocabulary(), preemb, fillmissing = True)
+      print(f'Resetting emsize-word to {preemb.dim()}.', file=sys.stderr)
+      args.emsize_word = preemb.dim()
       preemb_weights = torch.Tensor(preemb.weights)
+    self.pargs.emweights_word_name = args.init_emword
     self.pargs.emweights_word = preemb_weights
-    return args
 
 
   def prepareLoader(self, args):
@@ -155,14 +202,12 @@ class LttcPipe(object):
     if self.pargs.testset:
       test_loader = torch.utils.data.DataLoader(self.pargs.testset, batch_sampler = BatchSampler(__ItemSampler(self.pargs.testset), batch_size=args.batch_size, drop_last = False), num_workers = 0)
 
-
     print(__ItemSampler.__name__, file=sys.stderr)
     print('Shuffle training batches: ', args.shuffle_batches, file=sys.stderr)
 
     self.pargs.trainloader = train_loader
     self.pargs.testloader = test_loader
     self.pargs.ntrainbatches = len(train_loader)
-    return args
 
 
   def buildModel(self, args):
@@ -198,22 +243,26 @@ class LttcPipe(object):
     # processing function
     def process(batch_data, istraining):
       targets = batch_data['label']
-      outputs, labelweights = model(**batch_data)
-
+      outputs, labelweights, predictions = self.apply(model, batch_data)
       loss = criterion(outputs, targets)
-
-      predictions = self.getpredictions(outputs.data)
       return loss, (batch_data['id'], outputs, predictions, targets)
 
     print(model, file=sys.stderr)
+    num_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f'Total number of model parameters: {num_total_params:d}', file=sys.stderr)
     print(criterion, file=sys.stderr)
     print(optimizer, file=sys.stderr)
 
-    self.pargs.model = model
+    self.pargs.modelinstance = model
     self.pargs.modelprocessfun = process
-    self.pargs.criterion = criterion
-    self.pargs.optimizer = optimizer
-    return args
+    self.pargs.modelcriterion = criterion
+    self.pargs.modeloptimizer = optimizer
+
+    
+  def apply(self, model, dict_batch_data):
+    outputs, labelweights = model(**dict_batch_data)
+    predictions = self.getpredictions(outputs.data)
+    return outputs, labelweights, predictions
 
 
   def getpredictions(self, batch_logprobs):
@@ -297,7 +346,7 @@ class LttcPipe(object):
 
     # save the NN model
     with open(os.path.join(args.model, 'model.pt'), 'wb') as f:
-      torch.save(self.pargs.model, f)
+      torch.save(self.pargs.modelinstance, f)
 
     # save the parameters
     args.modelepoch = epoch
@@ -322,7 +371,7 @@ class LttcPipe(object):
   def pipeline(self, args):
 
     def evaluate(args, dloader):
-      model = self.pargs.model
+      model = self.pargs.modelinstance
       # Turn on evaluation mode which disables dropout.
       model.eval()
       test_loss_batch = torch.zeros(len(dloader))
@@ -358,7 +407,7 @@ class LttcPipe(object):
       return reg_loss
 
     def train(args):
-      model = self.pargs.model
+      model = self.pargs.modelinstance
       # Turn on training mode which enables dropout.
       model.train()
 
@@ -378,7 +427,7 @@ class LttcPipe(object):
           reg_loss = l1reg(model)
           loss += args.l1reg * reg_loss
         loss.backward()
-        self.pargs.optimizer.step()
+        self.pargs.modeloptimizer.step()
         # track some scores
         train_loss_batch[batch_i] = loss.item()
         self.pargs.confusion_meter.add(outputs.data, batch_targets)
@@ -423,7 +472,7 @@ class LttcPipe(object):
         test_scores = train_scores
 
       # print scores
-      tqdm.write(self.message_status_endepoch('', epoch, epoch_start_time, self.pargs.optimizer.getLearningRate(), train_loss, test_loss, train_scores, test_scores, best_run))
+      tqdm.write(self.message_status_endepoch('', epoch, epoch_start_time, self.pargs.modeloptimizer.getLearningRate(), train_loss, test_loss, train_scores, test_scores, best_run))
       if best_run.test_val < test_scores[self.pargs.best_run_test_valname]:
         tqdm.write(f'''  > Saving model and prediction results to '{args.model:s}'...''')
         self.savemodel(args, epoch)
@@ -452,8 +501,8 @@ class LttcPipe(object):
     print(self.pargs.modelargs, file=sys.stderr)
     # load model
     with open(os.path.join(dirname, 'model.pt'), 'rb') as f:
-      self.pargs.model = torch.load(f, map_location=self.pargs.device)
-    print(self.pargs.model, file=sys.stderr)
+      self.pargs.modelinstance = torch.load(f, map_location=self.pargs.device)
+    print(self.pargs.modelinstance, file=sys.stderr)
     # load indices
     wordindex = utils.Index.fromfile(os.path.join(dirname, 'ndx_vocab.txt')).freeze(silent=True)
     positionindex = utils.Index.fromfile(os.path.join(dirname, 'ndx_position.txt')).freeze(silent=True)
@@ -473,7 +522,7 @@ class LttcPipe(object):
 
   def serve(self, dirname, server):
     self.load(dirname)
-    self.pargs.model.eval()
+    self.pargs.modelinstance.eval()
 
     def predict_sample(text):
       tensors = self.pargs.dset.process_sample(text)
@@ -483,7 +532,7 @@ class LttcPipe(object):
       for t in tensors.values():
         t.unsqueeze_(0)
 
-      outputs, _ = self.pargs.model(**tensors)
+      outputs, _ = self.pargs.modelinstance(**tensors)
       predictions = self.getpredictions(outputs.data)
 
       # remove batch dimension by using only first entry
@@ -508,13 +557,29 @@ class LttcPipe(object):
       self.args = self.parseSystemArgs()
       self.args = self.prepareCuda(self.args)
       if self.args.serve:
+        torch.manual_seed(self.args.seed)
         self.serve(self.args.model, self.args.server)
       else:
-        self.args = self.loadDatasets(self.args)
-        self.args = self.loadaddlData(self.args)
-        self.args = self.prepareLoader(self.args)
-        self.args = self.buildModel(self.args)
-        self.pipeline(self.args)
+        if self.args.configs:
+          config_args = list(map(lambda cfg: (self.parseArgsFromConfigfile(copy.copy(self.args), cfg, keep=self.args._explicit_), cfg), self.args.configs))
+        else:
+          config_args = [ (self.args, None) ]
+        for args, config_name in config_args:
+          if not args:
+            print(f'Config {config_name} does not exist. Skipping!', file=sys.stderr)
+            continue
+          if os.path.isfile(os.path.join(args.model, 'model-final.pt')):
+            print(f"Model file already exists, skipping '{args.model}' (config_name).", file=sys.stderr)
+            continue
+          try:
+            torch.manual_seed(args.seed)
+            self.loadDatasets(args)
+            self.loadaddlData(args)
+            self.prepareLoader(args)
+            self.buildModel(args)
+            self.pipeline(args)
+          except (KeyboardInterrupt, SystemExit):
+            print('Process cancelled -- skipping config', file=sys.stderr)
     except (KeyboardInterrupt, SystemExit):
       print('Process cancelled', file=sys.stderr)
 
