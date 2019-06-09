@@ -13,7 +13,6 @@ import math
 from tqdm import tqdm
 import torch
 from torch.utils.data.sampler import BatchSampler, SequentialSampler, RandomSampler
-import torchnet
 
 import data
 import utils
@@ -368,16 +367,44 @@ class LttcPipe(object):
       m = '\n'.join(filter(lambda l: len(l) > 1, map(lambda l: l.strip(), message.split('\n'))))
       print(m, file=f)
 
-  def savepredictions(self, args, ids, logprobs, predictions, targets, scores):
-    outfile = os.path.join(args.model, 'model.predictions.tsv')
+
+  def savepredictions(self, args, ids, logprobs, predictions, targets, scores, suffix='-final'):
+    outfile = os.path.join(args.model, f'testpredictions{suffix}.tsv')
     assert len(ids) == len(logprobs) == len(predictions) == len(targets), f'Something is wrong, number of samples and number of predicions are different: {len(ids):s} {len(logprobs):s} {len(predictions):s} {len(targets):s}'
-    with open(outfile, 'w') as f:
+    with open(outfile, 'wt') as f:
       print('# ' + scores.string.replace('\n', '\n# '), file=f)
       for i in range(len(ids)):
         pred_classlabel = self.pargs.classindex[predictions[i]]
         true_classlabel = self.pargs.classindex[targets[i]]
         correct = int(predictions[i] == targets[i])
         print(f'{ids[i]:d}\t{pred_classlabel:s}\t{true_classlabel:s}\t{correct:d}\t{predictions[i]:d}\t{targets[i]:d}\t{logprobs[i]:}', file=f)
+        
+        
+  def load(self, dirname, suffix=''):
+    # load model args
+    self.pargs.modelargs = utils.AttributeHolder().load(f'parameters{suffix}.yml')
+    print(self.pargs.modelargs, file=sys.stderr)
+    # load model
+    with open(os.path.join(dirname, f'model{suffix}.pt'), 'rb') as f:
+      self.pargs.modelinstance = torch.load(f, map_location=self.pargs.device)
+    print(self.pargs.modelinstance, file=sys.stderr)
+    # load indices
+    wordindex = utils.Index.fromfile(os.path.join(dirname, 'ndx_vocab.txt')).freeze(silent=True)
+    positionindex = utils.Index.fromfile(os.path.join(dirname, 'ndx_position.txt')).freeze(silent=True)
+    classindex = utils.Index.fromfile(os.path.join(dirname, 'ndx_classes.txt')).freeze(silent=True)
+    self.pargs.indices = (wordindex, positionindex, classindex)
+    [ print(index, file=sys.stderr) for index in self.pargs.indices ]
+    # prepare dataset for pre-processing
+    self.pargs.dset = data.LttcDataset(path = None,
+                            lang = self.pargs.modelargs.lang,
+                            maxseqlen = self.pargs.modelargs.maxseqlentrain,
+                            index = wordindex,
+                            nbos = self.pargs.modelargs.nbostrain,
+                            neos = self.pargs.modelargs.neostrain,
+                            posiindex = positionindex,
+                            classindex = classindex,
+                            bert_model = self.pargs.modelargs.bert_model,
+                            maxseqlen_bert = self.pargs.modelargs.maxseqlen_berttrain).to(self.pargs.device)
 
 
   ###############################################################################
@@ -397,13 +424,12 @@ class LttcPipe(object):
 
       with torch.no_grad():
         for batch_i, batch_data in enumerate(tqdm(dloader, ncols=89, desc = 'Test ')):
-          loss, (sampleids, outputs, predictions_, targets_) = process(batch_data, False)
+          loss, (sampleids, outputs, predictions_, targets_) = process(batch_data, istraining=False)
           if args.l1reg > 0:
             reg_loss = l1reg(model)
             loss += args.l1reg * reg_loss
           # keep track of some scores
           test_loss_batch[batch_i] = loss.item()
-          self.pargs.confusion_meter.add(outputs.data, targets_)
           ids.extend(sampleids.tolist())
           logprobs.extend(outputs.data.tolist())
           predictions.extend(predictions_.tolist())
@@ -437,7 +463,7 @@ class LttcPipe(object):
       for batch_i, batch_data in enumerate(tqdm(self.pargs.trainloader, ncols=89, desc='Train')):
         batch_start_time = time.time()
         model.zero_grad()
-        loss, (_, outputs, batch_predictions, batch_targets) = process(batch_data, True)
+        loss, (_, outputs, batch_predictions, batch_targets) = process(batch_data, istraining=True)
         if args.l1reg > 0:
           reg_loss = l1reg(model)
           loss += args.l1reg * reg_loss
@@ -445,7 +471,6 @@ class LttcPipe(object):
         self.pargs.modeloptimizer.step()
         # track some scores
         train_loss_batch[batch_i] = loss.item()
-        self.pargs.confusion_meter.add(outputs.data, batch_targets)
         predictions.extend(batch_predictions.tolist())
         targets.extend(batch_targets.tolist())
         sample_i += batch_targets.size(0)
@@ -465,10 +490,9 @@ class LttcPipe(object):
     ###
     # Run pipeline
     ###
-    best_run = utils.AttributeHolder(test_val=0, epoch=0)
+    best_run = utils.AttributeHolder(test_val=float('-inf'), epoch=0)
     args.status_reports = min(args.status_reports, self.pargs.ntrainbatches)
     self.pargs.report_after_n_samples = math.ceil(self.pargs.ntrainsamples / (args.status_reports+1))
-    self.pargs.confusion_meter = torchnet.meter.ConfusionMeter(self.pargs.nclasses, normalized=True)
     process = self.pargs.modelprocessfun
     for epoch in tqdm(range(1,args.epochs+1), ncols=89, desc = 'Epochs'):
       epoch_start_time = time.time()
@@ -487,11 +511,12 @@ class LttcPipe(object):
         test_scores = train_scores
 
       # print scores
-      tqdm.write(self.message_status_endepoch('', epoch, epoch_start_time, self.pargs.modeloptimizer.getLearningRate(), train_loss, test_loss, train_scores, test_scores, best_run))
+      status_message = self.message_status_endepoch('', epoch, epoch_start_time, self.pargs.modeloptimizer.getLearningRate(), train_loss, test_loss, train_scores, test_scores, best_run)
+      tqdm.write(status_message)
       if best_run.test_val < test_scores[self.pargs.best_run_test_valname]:
         tqdm.write(f'''  > Saving model and prediction results to '{args.model:s}'...''')
-        self.savemodel(args, epoch)
-        self.savepredictions(args, test_sampleids, test_logprobs, test_predictions, test_targets, test_scores)
+        self.savemodel(args, epoch, status_message, suffix='')
+        self.savepredictions(args, test_sampleids, test_logprobs, test_predictions, test_targets, test_scores, suffix=f'')
         best_run.test_valname = self.pargs.best_run_test_valname
         best_run.test_val = test_scores[best_run.test_valname]
         best_run.epoch = epoch
@@ -501,43 +526,23 @@ class LttcPipe(object):
         best_run.train_loss = train_loss
         best_run.test_loss = test_loss
         tqdm.write('  > ... Finished saving\n  |')
+    # save final model and scores
+    tqdm.write(f'''  > Saving final model and prediction results to '{args.model:s}'...''')
+    self.savemodel(args, epoch, status_message, suffix='-final')
+    self.savepredictions(args, test_sampleids, test_logprobs, test_predictions, test_targets, test_scores, suffix='-final')
+    tqdm.write('  > ... Finished saving\n  |')
 
 
   def build_and_run(self, args):
-    self.args = self.prepareLoader(args)
-    self.args = self.buildModel(self.args)
-    self.pipeline(self.args)
-
-
-  def load(self, dirname):
-    # load model args
-    with open(os.path.join(dirname, 'parameters.yml'), 'rt') as f:
-      self.pargs.modelargs = utils.AttributeHolder().load(f)
-    print(self.pargs.modelargs, file=sys.stderr)
-    # load model
-    with open(os.path.join(dirname, 'model.pt'), 'rb') as f:
-      self.pargs.modelinstance = torch.load(f, map_location=self.pargs.device)
-    print(self.pargs.modelinstance, file=sys.stderr)
-    # load indices
-    wordindex = utils.Index.fromfile(os.path.join(dirname, 'ndx_vocab.txt')).freeze(silent=True)
-    positionindex = utils.Index.fromfile(os.path.join(dirname, 'ndx_position.txt')).freeze(silent=True)
-    classindex = utils.Index.fromfile(os.path.join(dirname, 'ndx_classes.txt')).freeze(silent=True)
-    self.pargs.indices = (wordindex, positionindex, classindex)
-    [ print(index, file=sys.stderr) for index in self.pargs.indices ]
-    # prepare dataset for pre-processing
-    self.pargs.dset = data.LttcDataset(path = None,
-                            lang = self.pargs.modelargs.lang,
-                            maxseqlen = self.pargs.modelargs.maxseqlentrain,
-                            index = wordindex,
-                            nbos = self.pargs.modelargs.nbostrain,
-                            neos = self.pargs.modelargs.neostrain,
-                            posiindex = positionindex,
-                            classindex = classindex).to(self.pargs.device)
-
+    self.prepareLoader(args)
+    self.buildModel(args)
+    self.pipeline(args)
+    
 
   def serve(self, dirname, server):
     self.load(dirname)
     self.pargs.modelinstance.eval()
+    self.pargs.dset.cache_device_tensors = False
 
     def predict_sample(text):
       tensors = self.pargs.dset.process_sample(text)
