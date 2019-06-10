@@ -329,9 +329,9 @@ def createWrappedOptimizerClass(optimizer_clazz):
       super(Wrapped, self).__init__(*args, **kwargs)
       self.clip = clip
     def getLearningRate(self):
-      lr = [group['lr'] for group in self.param_groups]
+      lr = [ group['lr'] for group in self.param_groups ]
       return lr[0] if len(lr) == 1 else lr
-    def adjustLearningRate(self, factor=None):
+    def adjustLearningRate(self, factor=1.):
       for group in self.param_groups:
         newlr = group['lr'] * factor
         group['lr'] = newlr

@@ -49,7 +49,8 @@ class LttcPipe(object):
     parser.add_argument('--bert-model', default='bert-base-uncased', type=str, help='Bert pre-trained model that is also used for wordpiece tokenization.', action=StoreAction)
     parser.add_argument('--epochs', default=100, type=int, help='upper epoch limit', action=StoreAction)
     parser.add_argument('--optim', default='SGD', type=str, help='type of optimizer (SGD, Adam, Adagrad, ASGD, SimpleSGD)', action=StoreAction)
-    parser.add_argument('--loss', default='NLLLoss', type=str, help='type of loss function to use (NLLLoss, CrossEntropyLoss, MarginLoss, SpreadLoss)', action=StoreAction)
+    parser.add_argument('--optimscheduler', default=None, type=str, help='type of scheduler for adjustment of the the learning rate during training [ None (default), CosineAnnealingLR, ...)', action=StoreAction)
+    parser.add_argument('--loss', default='NLLLoss', type=str, help='type of loss function to use [ NLLLoss (default), CrossEntropyLoss, MarginLoss, SpreadLoss, ... ]', action=StoreAction)
     parser.add_argument('--emsize-word', default=300, type=int, help='size of word embeddings', action=StoreAction)
     parser.add_argument('--emsize-posi', default=5, type=int, help='size of the position embeddings', action=StoreAction)
     parser.add_argument('--maxlength', default=-1, type=int, help='maximum length of a sequence (use -1 for determining the length from the training data)', action=StoreAction)
@@ -238,6 +239,13 @@ class LttcPipe(object):
         raise ValueError( '''Invalid option `%s` for 'optimizer' was supplied.''' % args.optim)
       Optimizer__ = getattr(torch.optim, args.optim)
     optimizer = utils.createWrappedOptimizerClass(Optimizer__)(model.parameters(), lr =args.lr, clip=args.clip, weight_decay=args.wdecay)
+    
+    # scheduler, i.e. in order to control the learning rate
+    scheduler = optimizer
+    if args.optimscheduler:
+      if not hasattr(torch.optim.lr_scheduler, args.optimscheduler):
+        raise ValueError( f"Unknown scheduler '{args.optimscheduler}'.")
+      scheduler = getattr(torch.optim.lr_scheduler, args.optimscheduler)(optimizer, args.epochs)
 
     # processing function
     def process(batch_data, istraining):
@@ -251,11 +259,13 @@ class LttcPipe(object):
     print(f'Total number of model parameters: {num_total_params:d}', file=sys.stderr)
     print(criterion, file=sys.stderr)
     print(optimizer, file=sys.stderr)
+    
 
     self.pargs.modelinstance = model
     self.pargs.modelprocessfun = process
     self.pargs.modelcriterion = criterion
     self.pargs.modeloptimizer = optimizer
+    self.pargs.modeloptimizingscheduler = scheduler
 
     
   def apply(self, model, dict_batch_data):
@@ -468,7 +478,7 @@ class LttcPipe(object):
           reg_loss = l1reg(model)
           loss += args.l1reg * reg_loss
         loss.backward()
-        self.pargs.modeloptimizer.step()
+        self.pargs.modeloptimizingscheduler.step()
         # track some scores
         train_loss_batch[batch_i] = loss.item()
         predictions.extend(batch_predictions.tolist())
