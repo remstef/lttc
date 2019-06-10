@@ -240,12 +240,12 @@ class LttcPipe(object):
       Optimizer__ = getattr(torch.optim, args.optim)
     optimizer = utils.createWrappedOptimizerClass(Optimizer__)(model.parameters(), lr =args.lr, clip=args.clip, weight_decay=args.wdecay)
     
-    # scheduler, i.e. in order to control the learning rate
+    # scheduler, e.g. in order to control the learning rate of the optimizer
     scheduler = optimizer
-    if args.optimscheduler:
-      if not hasattr(torch.optim.lr_scheduler, args.optimscheduler):
-        raise ValueError( f"Unknown scheduler '{args.optimscheduler}'.")
-      scheduler = getattr(torch.optim.lr_scheduler, args.optimscheduler)(optimizer, args.epochs)
+    if args.optimsched:
+      if not hasattr(torch.optim.lr_scheduler, args.optimsched):
+        raise ValueError( f"Unknown scheduler '{args.optimsched}'.")
+      scheduler = getattr(torch.optim.lr_scheduler, args.optimsched)(optimizer, args.epochs)
 
     # processing function
     def process(batch_data, istraining):
@@ -258,7 +258,7 @@ class LttcPipe(object):
     num_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f'Total number of model parameters: {num_total_params:d}', file=sys.stderr)
     print(criterion, file=sys.stderr)
-    print(optimizer, file=sys.stderr)
+    print(scheduler, file=sys.stderr)
     
 
     self.pargs.modelinstance = model
