@@ -49,7 +49,7 @@ class LttcPipe(object):
     parser.add_argument('--bert-model', default='bert-base-uncased', type=str, help='Bert pre-trained model that is also used for wordpiece tokenization.', action=StoreAction)
     parser.add_argument('--epochs', default=100, type=int, help='upper epoch limit', action=StoreAction)
     parser.add_argument('--optim', default='SGD', type=str, help='type of optimizer (SGD, Adam, Adagrad, ASGD, SimpleSGD)', action=StoreAction)
-    parser.add_argument('--optimscheduler', default=None, type=str, help='type of scheduler for adjustment of the the learning rate during training [ None (default), CosineAnnealingLR, ...)', action=StoreAction)
+    parser.add_argument('--optimsched', default=None, type=str, help='type of scheduler for adjustment of the the learning rate during training [ None (default), CosineAnnealingLR, ...)', action=StoreAction)
     parser.add_argument('--loss', default='NLLLoss', type=str, help='type of loss function to use [ NLLLoss (default), CrossEntropyLoss, MarginLoss, SpreadLoss, ... ]', action=StoreAction)
     parser.add_argument('--emsize-word', default=300, type=int, help='size of word embeddings', action=StoreAction)
     parser.add_argument('--emsize-posi', default=5, type=int, help='size of the position embeddings', action=StoreAction)
@@ -258,8 +258,8 @@ class LttcPipe(object):
     num_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f'Total number of model parameters: {num_total_params:d}', file=sys.stderr)
     print(criterion, file=sys.stderr)
-    print(scheduler, file=sys.stderr)
-    
+    print(optimizer, file=sys.stderr)
+    print(args.optimsched, file=sys.stderr)
 
     self.pargs.modelinstance = model
     self.pargs.modelprocessfun = process
