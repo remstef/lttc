@@ -155,11 +155,11 @@ class BertSeqFT(torch.nn.Module):
     (batch_size, seqlen) = seq_bert.size()
     _, pooled_out = self.bertmodel(seq_bert, token_type_ids=None, attention_mask=None, output_all_encoded_layers=False)
     pooled_out = self.drop(pooled_out)
-    o = self.softmax(self.linear(pooled_out))    
+    o = self.linear(pooled_out)
+    # o = self.softmax(o)
     return o, 0
   
   
-
 class BertSeqNoFT(torch.nn.Module):
   '''
    same as BertForSequenceClassification w/o fine tuning
@@ -184,7 +184,7 @@ class BertSeqNoFT(torch.nn.Module):
     self.bertmodel_size = 768
     self.drop = torch.nn.Dropout(dropout)
     self.linear = torch.nn.Linear(self.bertmodel_size, nclasses)
-    self.softmax = torch.nn.LogSoftmax(dim=1)
+    #self.softmax = torch.nn.LogSoftmax(dim=1)
 
   def forward(self, *args, seq_bert=RequiredParam, **kwargs):
     # seq_bert = batch_size x max_seq_length (padded) : sentence
@@ -193,6 +193,7 @@ class BertSeqNoFT(torch.nn.Module):
     with torch.no_grad():
       _, pooled_out = self.bertmodel(seq_bert, token_type_ids=None, attention_mask=None, output_all_encoded_layers=False)
     pooled_out = self.drop(pooled_out)
-    o = self.softmax(self.linear(pooled_out))
+    o = self.linear(pooled_out)
+    #o = self.softmax(o)
     
     return o, 0
