@@ -354,12 +354,15 @@ class LttcPipe(object):
         '=' * 88)
 
 
-  def freeze_and_save_indices(self, args, wordindex, positionindex, classindex):
+  def freeze_and_save_indices(self, args, wordindex=None, positionindex=None, classindex=None):
     # make sure the directory exists
     os.makedirs(args.model, exist_ok=True)
-    wordindex.freeze(silent = True).tofile(os.path.join(args.model, 'ndx_vocab.txt'))
-    positionindex.freeze(silent = True).tofile(os.path.join(args.model, 'ndx_position.txt'))
-    classindex.freeze(silent = False).tofile(os.path.join(args.model, 'ndx_classes.txt'))
+    if wordindex:
+      wordindex.freeze(silent = True).tofile(os.path.join(args.model, 'ndx_vocab.txt'))
+    if positionindex:
+      positionindex.freeze(silent = True).tofile(os.path.join(args.model, 'ndx_position.txt'))
+    if classindex:
+      classindex.freeze(silent = False).tofile(os.path.join(args.model, 'ndx_classes.txt'))
 
 
   def savemodel(self, args, epoch, message='', suffix='-final'):

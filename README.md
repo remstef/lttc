@@ -1,4 +1,5 @@
-# lttc - eL double Tee See
+# lttc - [eL double Tee See]
+ 
  __Textclassification with PyTorch__
 
  _Note: Documentation is in progress_
@@ -18,3 +19,6 @@
 ### Serving:
 
 ### Using / Predicting:
+
+### Examples:
+
