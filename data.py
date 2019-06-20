@@ -47,7 +47,6 @@ class LttcDataset(torch.utils.data.Dataset):
     super(LttcDataset, self).__init__()
     self.path = path
     self.maxseqlen = maxseqlen
-    self.maxseqlen_bert = maxseqlen_bert
     self.nbos = max(0, nbos)
     self.neos = max(1, neos)
     self.index = index if index is not None else Index()
@@ -63,6 +62,7 @@ class LttcDataset(torch.utils.data.Dataset):
     self.lang = lang
     self.spacy_model = importSpacy(self.lang)
     self.bert_tokenizer = BertTokenizer.from_pretrained(bert_model, do_lower_case='uncased' in bert_model) if isinstance(bert_model, str) else bert_model
+    self.maxseqlen_bert = maxseqlen_bert if maxseqlen_bert else self.bert_tokenizer.max_len
     self.samples = pandas.DataFrame(columns = [ 'id', 'filename', 'rawdata', 'spacydata', 'spacy_to_bert_position', 'seq', 'seq_bert', 'seqlen', 'seqlen_bert', 'seq_recon', 'pseq', 'pseq_rev', 'label', 'labelid' ])
     self.tensor_cache = [] if cache_device_tensors else None
 
@@ -77,7 +77,7 @@ class LttcDataset(torch.utils.data.Dataset):
     #df = df.progress_apply(self.transform_data_row, axis=1)
     df = df.apply(self.transform_data_row, axis=1)
     # pad
-    df['seq'] = df.seq.apply(lambda s: pad(s, self.maxseqlen, self.padidx))
+    df['seq'] = df.seq.apply(lambda s: pad(s, self.maxseqlen, [ self.padidx ]))
     df['seqlen'] = df.seqlen.apply(lambda l: min(l, self.maxseqlen))
     # prepare positional sequences
     df = df.apply(self.prepare_positional, axis=1)
@@ -110,6 +110,7 @@ class LttcDataset(torch.utils.data.Dataset):
             break
           samples.loc[len(samples)] = {'filename':f'{filename}:{i}', 'label':label, 'rawdata': line}
       # filter lines that have length zero
+      samples.rawdata = samples.rawdata.apply(lambda rd: rd.replace('\\n','\n'))
       samples.rawdata = samples.rawdata.apply(str.strip)
       samples = samples[samples.rawdata.apply(len) > 0]
       # apply spacy
@@ -146,11 +147,11 @@ class LttcDataset(torch.utils.data.Dataset):
     if not self.maxseqlen or self.maxseqlen < 0:
       self.maxseqlen = samples.seqlen.max().item()
     if not self.maxseqlen_bert or self.maxseqlen_bert < 0:
-      self.maxseqlen_bert = samples.seqlen_bert.max().item()
-    samples['seq'] = samples.seq.progress_apply(lambda s: pad(s, self.maxseqlen, self.padidx))
+      self.maxseqlen_bert = min(samples.seqlen_bert.max().item(), self.bert_tokenizer.max_len)
+    samples['seq'] = samples.seq.progress_apply(lambda s: pad(s, self.maxseqlen, [ self.padidx ]))
     samples['seqlen'] = samples.seqlen.progress_apply(lambda l: min(l, self.maxseqlen))
-    samples['seq_bert'] = samples.seq_bert.progress_apply(lambda s: pad(s, self.maxseqlen_bert, self.padidx))
-    samples['seqlen_bert'] = samples.seqlen.progress_apply(lambda l: min(l, self.maxseqlen_bert))
+    samples['seq_bert'] = samples.seq_bert.progress_apply(lambda sb: pad(sb, self.maxseqlen_bert, self.bert_tokenizer.convert_tokens_to_ids(['[SEP]', '[PAD]'])))
+    samples['seqlen_bert'] = samples.seqlen_bert.progress_apply(lambda l: min(l, self.maxseqlen_bert))
     samples = samples[samples.seqlen > (self.nbos + self.neos)] # filter empty samples
     # prepare positional sequences
     samples = samples.progress_apply(self.prepare_positional, axis=1)
@@ -188,11 +189,17 @@ class LttcDataset(torch.utils.data.Dataset):
       bert_tok = self.bert_tokenizer.tokenize(t[i])
       row['spacy_to_bert_position'][i] = list(range(len(t_bert), len(t_bert) + len(bert_tok)))
       t_bert.extend(bert_tok)
-  
+
+    # trim bert tokens
+    if len(t_bert) > (self.bert_tokenizer.max_len-1):
+      t_bert = t_bert[:(self.bert_tokenizer.max_len-1)]
+    t_bert.append('[SEP]')
+    len_t_bert = len(t_bert)
+    
     row['seq'] = torch.LongTensor(list(map(lambda tok: self.index.add(tok), t)))
     row['seqlen'] = row.seq.size(0)
     row['seq_bert'] = torch.LongTensor(self.bert_tokenizer.convert_tokens_to_ids(t_bert))
-    row['seqlen_bert'] = row.seq_bert.size(0)
+    row['seqlen_bert'] = len_t_bert
     row['labelid'] = self.classindex.add(row['label'])
     row['id'] = hash(row.seq)
     return row
@@ -216,8 +223,8 @@ class LttcDataset(torch.utils.data.Dataset):
     # pad
     padix = self.posiindex.add(self.maxseqlen+1)
     padix_rev = self.posiindex.add(-(self.maxseqlen+1))
-    ps = pad(ps, self.maxseqlen, padix)
-    ps_rev = pad(ps_rev, self.maxseqlen, padix_rev)
+    ps = pad(ps, self.maxseqlen, [ padix ])
+    ps_rev = pad(ps_rev, self.maxseqlen, [ padix_rev ])
     row['pseq'] = ps
     row['pseq_rev'] = ps_rev
     return row

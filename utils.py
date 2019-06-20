@@ -351,8 +351,10 @@ def createWrappedOptimizerClass(optimizer_clazz):
   return Wrapped
 
 def pad(x, length, padval):
-  y = torch.ones((length,)).long() * padval
-  y[:min(len(x), length)] = x[:min(len(x), length)]
+  y = torch.ones((length,)).long() * padval[-1]
+  l = min(len(x), length)
+  y[:l] = x[:l]
+  y[(l-1)] = padval[0]
   return y
 
 def makeOneHot(X, maxval):
