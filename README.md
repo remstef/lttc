@@ -33,6 +33,8 @@ The make file downloads the following embeddings:
 * simple wikipedia fasttext embedding
 * German CC fasttext embedding
 
+On Mac you might need to install libomp via brew.
+
 ## Data Structure
 
 Once you unpacked the archiv and ran the installation scripts, you should see some directories.
@@ -64,6 +66,7 @@ Classify:
 * `--lang` (type=str, default='en): Language. Currently supported: en (default), de, fr.
 
 Training (for more advanced scenarios a hyperparameter tool is recomemnded):
+
 * `--train` (type=str, default='./data/SMSSpamCollection/train): dataset location which should be used for training (e.g. './data/SMSSpamCollection' for full data or './data/SMSSpamCollection/train' for training data only). This should be kept local due performance
 * `--test` (type=str, default='./data/SMSSpamCollection/test): dataset location whichshould be used for testing (e.g. './data/SMSSpamCollection/test'). Can be omitted for training, testing will then be performed on the training data.
 * `--epochs` (default=100, type=int): upper epoch limit. This should be interrupted if loss and accuracy do not getting better, best modell will be saved, maybe give pytorch interrupt criteria.
@@ -116,7 +119,7 @@ if you want to use a pre-trained embedding use the --init-emword switch, e.g.
 
 This should be sufficient to get a first model that we can try for the start. After that comes the finetuning.
 
-If using BERT have a look on the [hugging face library](https://github.com/huggingface/pytorch-pretrained-BERT)
+If using BERT have a look on the [Hugging Face Library](https://github.com/huggingface/pytorch-pretrained-BERT)
 
 ## Using / Predicting
 
@@ -129,9 +132,7 @@ specify the directory which contains the model files. The directory should conta
 * ndx_position.txt
 * parameters.pkl
 
-BERT it's tokenization
-
-You can download a trained model of the SMSSpamCollection at http://ltdata1.informatik.uni-hamburg.de/lttc/lttc-models.tar.gz as an example for testing (it's too large for an attachment to this email). Just unpack the file in the lttc folder. You can then start a TCP server, serving the model with:
+You can download a trained model of the [SMSSpamCollection](http://ltdata1.informatik.uni-hamburg.de/lttc/lttc-models.tar.gz) as an example for testing (it's too large for an attachment to this email). Just unpack the file in the lttc folder. You can then start a TCP server, serving the model with:
 
 `python lttc.py --serve --model=savedmodels/SMSSpamCollection_default`
 
@@ -144,18 +145,15 @@ You can use any TCP client of your choice to test the model. Here is a short exa
 echo 'WINNER! Credit for free!' | nc 127.0.0.1 8881
 echo "Hey Mom, I'm coming late for dinner." | nc 127.0.0.1 8881
 
-The output for each command will be something like
+The output for each command will be something like:
+
+```bash
 spam    -0.4058372974395752     spam:-0.4058 ham:-1.0979
 ham     -0.0028526782989501953  spam:-5.8609 ham:-0.0029
+````
 
 The fields are tab separated, first field is the identified class, second field is the logarithmic value of the confidence value (class probability), the third field is a summary of log probabilities of all classes. Note the the input format must be UTF-8 encoded and one line per document!
 
 You can also pass an entire file this way, e.g.
 
 `cat data/SMSSpamCollection/test/spam/docs.txt | nc 127.0.0.1 8881`
-
-## Problems and solutions during isntallation
-
-* torchnet: no conda package pip only
-* needed to install libomp via brew on Mac
-* pyfasttext is no longer maintained: use the official Python binding from the [fastText repository](https://github.com/facebookresearch/fastText/tree/master/python), need to install `from fastText import FastText`.
