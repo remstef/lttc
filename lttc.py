@@ -20,6 +20,10 @@ import modules
 import embedding
 
 class LttcPipe(object):
+  """
+  A class the builds a pytorch training pipeline for BertSeqFT or convkim models.
+  It can be used via command line args.
+  """
 
   def __init__(self):
     super(LttcPipe, self).__init__()
