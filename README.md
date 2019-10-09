@@ -37,7 +37,7 @@ Once you unpacked the archiv and ran the installation scripts, you should see so
 * ./embedding: The 'embedding' directory contains the embeddings, this is not a requirement, you can put them anywhere in the filesystem
 * ./data: The data directory contains an  example dataset (SMSSpamCollection [2]) for reference, any new dataset should roughly follow the same hierarchical structure.
 * ./data/SMSSpamCollection: The structure of the dataset is split into two subdirectories 'train' and 'test'. Each subdirectory contains one directory for each class. The name of the directory is also the classlabel. In the current example dataset this is  'ham' and 'spam', for our use case this could be 'training_description' and 'Other' or any name the comes to your mind. Within each of these directories, should be one or more text files (only '.txt' files will be used) which contain only textsamples for the particular class. The textfiles must be UTF-8 encoded and the content must be one document per line! Each line will be interpreted as a sample.
-* ./data/20NewsGroups: Same as above only for multiple classes.
+* ./data/TwentyNewsGroups: Same as above only for multiple classes.
 
 ## Commands
 
