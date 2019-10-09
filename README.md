@@ -107,17 +107,11 @@ you can also omit the testing directory. The model will then be trained on each 
 
 The application will save a preprocessed version of the documents in the dataset folder next to the .txt files (e.g. data/SMSSpamCollection/train/ham/docs1.txt__en_core_web_sm__2.1.0.pkl). If you change the content of the txt file, you'll have to remove the '.pkl' file manually.
 
-Don't forget to change the language for the current use case to German (--lang=de)!
-
-The model will train 100 epochs and it will provide you with some status output. If the F-score of the testset improves the model is stored by default in './savedmodels/model', after each epoch you will see the F-scores and at which epoch the best score was reached. You can cancel the process once the scores do not improve anymore (or increase the number of epochs with --epochs=200). If you have a GPU available for training pass the '--cuda' parameter and training will be much faster :).
+The model will train 100 epochs and it will provide you with some status output. If the F-score of the testset improves the model is stored by default in './savedmodels/model', after each epoch you will see the F-scores and at which epoch the best score was reached. You can cancel the process once the scores do not improve anymore (or increase the number of epochs with --epochs=200). If you have a GPU available for training pass the '--cuda' parameter and training will be much faster.
 
 if you want to use a pre-trained embedding use the --init-emword switch, e.g.
 
 `python lttc.py --lang=en --train=data/SMSSpamCollection/train --test=data/SMSSpamCollection/test --init-emword=embedding/wiki.simple.bin`
-
-(use --init-emword=embedding/cc.de.300.bin for German)
-
-This should be sufficient to get a first model that we can try for the start. After that comes the finetuning.
 
 If using BERT have a look on the [Hugging Face Library](https://github.com/huggingface/pytorch-pretrained-BERT)
 
@@ -132,9 +126,9 @@ specify the directory which contains the model files. The directory should conta
 * ndx_position.txt
 * parameters.pkl
 
-You can download a trained model of the [SMSSpamCollection](http://ltdata1.informatik.uni-hamburg.de/lttc/lttc-models.tar.gz) as an example for testing (it's too large for an attachment to this email). Just unpack the file in the lttc folder. You can then start a TCP server, serving the model with:
+You can start a TCP server, serving the model with:
 
-`python lttc.py --serve --model=savedmodels/SMSSpamCollection_default`
+`python lttc.py --serve --model=savedmodels/{modelname}`
 
 By default it uses the host 127.0.0.1 and port 8881. You can specify different by using the --server flag, e.g.:
 
@@ -142,8 +136,10 @@ By default it uses the host 127.0.0.1 and port 8881. You can specify different b
 
 You can use any TCP client of your choice to test the model. Here is a short example using netcat:
 
+`
 echo 'WINNER! Credit for free!' | nc 127.0.0.1 8881
 echo "Hey Mom, I'm coming late for dinner." | nc 127.0.0.1 8881
+`
 
 The output for each command will be something like:
 
