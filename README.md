@@ -5,16 +5,11 @@ The implementation is suitable for different classification document scenarios. 
 
 The Convolutional Neural Networks based upon the ideas of (Kim, 2014). Further reading: [Understanding Convolutional Neural Networks for NLP](http://www.wildml.com/2015/11/understanding-convolutional-neural-networks-for-nlp/).
 
-Further inbuild classification techniques are:
-
-* Sequence classification [NCRF++](https://github.com/jiesutd/NCRFpp) in order to identify and recommend correlating items
-* Textrank or BERT are possible options. PyTorch provides 8 models (torch.nn.Module) with pre-trained weights (in the modeling.py file), see [Repository of pretrained Transformers](https://github.com/huggingface/pytorch-pretrained-BERT) from huggingface.
-
 The models have by default a softmax layer as ouput layer. So multi class is working out-of-the-box.
 
 ## Installing
 
-For convenience there is a makefile. However, especially during build of cython there could be problems depending on your environment. You might walk through the steps manually if this happens. As pyfasttext is no longer maintained in the offical repo: you might use the official Python binding from the [fastText repository](https://github.com/facebookresearch/fastText/tree/master/python).
+For convenience there is a makefile. However, especially during build of cython there could be problems depending on your environment. You might walk through the steps manually if this happens.
 
 Recommendations:
 
@@ -24,9 +19,9 @@ Run `make install` and check `install.log` - installs all requirments
 
 For training you might need an embedding for initialization of the embedding layer. 
 
-Run `make embedding` to download the pre-trained embeddings (you will be prompted for English and German, I guess the German one should be sufficient).
+Run `make embedding` to download the pre-trained embeddings 
 
-The application is written in python3, so it should basically run on any platform, but it is tested under Mac and Linux, so you preferably might want to run this in a unix environment. For training the classifier it's recommended to use a GPU with CUDA >9. For reference this package was tested with `Python 3.7.4 [Clang 4.0.1 (tags/RELEASE_401/final)] :: Anaconda, Inc..`.
+The application is written in python3 and tested under Mac and Linux. For training the classifier it's recommended to use a GPU with CUDA >9. For reference this package was tested with `Python 3.7.4 [Clang 4.0.1 (tags/RELEASE_401/final)] :: Anaconda, Inc..`.
 
 The make file downloads the following embeddings:
 
@@ -37,13 +32,12 @@ On Mac you might need to install libomp via brew.
 
 ## Data Structure
 
-Once you unpacked the archiv and ran the installation scripts, you should see some directories.
+Once you unpacked the archiv and ran the installation scripts, you should see some data directories.
 
 * ./embedding: The 'embedding' directory contains the embeddings, this is not a requirement, you can put them anywhere in the filesystem
 * ./data: The data directory contains an  example dataset (SMSSpamCollection [2]) for reference, any new dataset should roughly follow the same hierarchical structure.
 * ./data/SMSSpamCollection: The structure of the dataset is split into two subdirectories 'train' and 'test'. Each subdirectory contains one directory for each class. The name of the directory is also the classlabel. In the current example dataset this is  'ham' and 'spam', for our use case this could be 'training_description' and 'Other' or any name the comes to your mind. Within each of these directories, should be one or more text files (only '.txt' files will be used) which contain only textsamples for the particular class. The textfiles must be UTF-8 encoded and the content must be one document per line! Each line will be interpreted as a sample.
-
-Currently there is no real preprocessing of the text - tbd!
+* ./data/20NewsGroups: Same as above only for multiple classes.
 
 ## Commands
 
@@ -56,7 +50,7 @@ Run
 
 `python lttc.py --help`
 
-to see the list of parameters (you don't need care for each parameter, some of them are not even used in the current setting). I defined some default parameter values that should work to train a reasonable model, but of course, finetuning of those parameters at a later point will increase the quality of the model and hence the live predictions.
+to see the list of parameters. 
 
 ### Parameters
 
@@ -65,34 +59,33 @@ Classify:
 * `--model`(default='./savedmodels/model', type=str): path to save the final model.
 * `--lang` (type=str, default='en): Language. Currently supported: en (default), de, fr.
 
-Training (for more advanced scenarios a hyperparameter tool is recomemnded):
-
-* `--train` (type=str, default='./data/SMSSpamCollection/train): dataset location which should be used for training (e.g. './data/SMSSpamCollection' for full data or './data/SMSSpamCollection/train' for training data only). This should be kept local due performance
+* `--train` (type=str, default='./data/SMSSpamCollection/train): dataset location which should be used for training (e.g. './data/SMSSpamCollection' for full data or './data/SMSSpamCollection/train' for training data only)
 * `--test` (type=str, default='./data/SMSSpamCollection/test): dataset location whichshould be used for testing (e.g. './data/SMSSpamCollection/test'). Can be omitted for training, testing will then be performed on the training data.
-* `--epochs` (default=100, type=int): upper epoch limit. This should be interrupted if loss and accuracy do not getting better, best modell will be saved, maybe give pytorch interrupt criteria.
+* `--epochs` (default=100, type=int): upper epoch limit. This should be interrupted if loss and accuracy do not improve, best modell will be saved.
 *`--optim` (default='SGD', type=str): type of optimizer (SGD, Adam, Adagrad, ASGD, SimpleSGD).
 * `--loss` (default='NLLLoss', type=str): type of loss function to use (NLLLoss, CrossEntropyLoss, MarginLoss, SpreadLoss).
 * `--emsize-word` (default=300, type=int): size of word embeddings. Standard values usually don't need to be optimized (BERT 768, Word2Vec 300).
 * `--emsize-posi` (default=5, type=int):size of the position embeddings.
 * `--maxlength` (default=-1, type=int): maximum length of a sequence (use -1 for determining the length from the training data). Limit max length if most sentences shorter than max lenght.
-* `--context-window` (default=0, type=int): size of the moving window of left and right contexts for concatenatation. Context window looks on neigbouring words and concatenates them. This helps if big data is avaialable, otherwise feature vector is getting spares.
+* `--context-window` (default=0, type=int): size of the moving window of left and right contexts for concatenatation. Context window looks on neigboring words and concatenates them. This helps if a lot of data is avaialable.
 * `--convfilters` (default='1024,1024,1024', type=str): number of convolution filters to apply.
 * `--convwindows` (default='3,4,5', type=str): sizes of the moving convolutional window.
 * `--convstrides` (default='1,1,1', type=str): strides of convolutions.
-* `--conv-activation` (default='ReLU', type=str): activation function to use after convolutinal layer (ReLU, Tanh).
+* `--conv-activation` (default='ReLU', type=str): activation function to use after convolutinal layer (ReLU, GeLU, Tanh).
 * `--nhid` (default=200, type=int): number of hidden units.
 * `--lr` (default=.1, type=float): initial learning rate.
-* `--lr-decay` (default=0.25, type=float): decay amount of learning learning rate if no validation improvement occurs. This depends on optimizer (e.g. adam, some do not have ones).
-* `--wdecay` (default=1.2e-6, type=float): weight decay applied to all weights(weights of gradients hyperparam, not used so far).
+* `--lr-decay` (default=0.25, type=float): decay amount of learning learning rate if no validation improvement occurs. This depends on optimizer.
 * `--l1reg` (default=.0, type=float): add l1 regularuzation loss.
 * `--clip` (default=-1, type=float): , gradient clipping (set to -1 to avoid clipping)
 * `--batch-size` (default=64, type=int, metavar='N'):  batch size.
-* `--dropout` (default=0.5, type=float): dropout applied to layers (0 = no dropout)* `--seed` (default=1111, type=int): random seed as initialaized randomly, criteria for significans
+* `--dropout` (default=0.5, type=float): dropout applied to layers (0 = no dropout)
+* `--seed` (default=1111, type=int): random seed as initialized randomly.
 * `--nlines` (default=-1, type=int, metavar='N'): debug param, number of lines to process, -1 for all.
 * `--status-reports` (default=3, type=int, metavar='N'): logging param, generate N reports during one training epoch (N=min(N, nbatches)).
-* `--init-emword` (default='', type=str): path to initial word embedding; emsize-word must match size of embedding. This load pretrained embeddings !!! * `--fix-emword` (action='store_true'): Specify if the word embedding should be excluded from further training. It fixes train embeddings
+* `--init-emword` (default='', type=str): path to initial word embedding; emsize-word must match size of embedding.
+* `--fix-emword` (action='store_true'): Specify if the word embedding should be excluded from further optimization.
 * `--shuffle-samples` (action='store_true'): shuffle samples.
-* `--shuffle-batches` (action='store_true): shuffle batches. Influences the shuffel order.
+* `--shuffle-batches` (action='store_true): shuffle batches.
 * `--cuda` (action='store_true'): use CUDA if available
 
 ### Training
