@@ -81,10 +81,10 @@ to see the list of parameters.
 * `--nlines` (default=-1, type=int, metavar='N'): debug param, number of lines to process, -1 for all.
 * `--status-reports` (default=3, type=int, metavar='N'): logging param, generate N reports during one training epoch (N=min(N, nbatches)).
 * `--init-emword` (default='', type=str): path to initial word embedding; emsize-word must match size of embedding.
-* `--fix-emword` (action='store_true'): Specify if the word embedding should be excluded from further optimization.
-* `--shuffle-samples` (action='store_true'): shuffle samples.
-* `--shuffle-batches` (action='store_true): shuffle batches.
-* `--cuda` (action='store_true'): use CUDA if available
+* `--fix-emword` (default=False): Specify if the word embedding should be excluded from further optimization.
+* `--shuffle-samples` (default=False): shuffle samples.
+* `--shuffle-batches` (default=False): shuffle batches.
+* `--cuda` (default=False): use CUDA if available
 
 ### Training
 
