@@ -54,8 +54,6 @@ to see the list of parameters.
 
 ### Parameters
 
-Classify:
-
 * `--model`(default='./savedmodels/model', type=str): path to save the final model.
 * `--lang` (type=str, default='en): Language. Currently supported: en (default), de, fr.
 
