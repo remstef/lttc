@@ -123,7 +123,7 @@ You can start a TCP server, serving the model with:
 
 By default it uses the host 127.0.0.1 and port 8881. You can specify different by using the --server flag, e.g.:
 
-`python lttc.py --serve --model=savedmodels/SMSSpamCollection_default --server=0.0.0.0:8882`
+`python lttc.py --serve --model=savedmodels/SMSSpamCollection_default --server=0.0.0.0:8881`
 
 You can use any TCP client of your choice to test the model. Here is a short example using netcat:
 
