@@ -13,13 +13,13 @@ For convenience there is a makefile. However, especially during build of cython 
 
 Recommendations:
 
-using Conda: as reference I added environment.yaml
+using Conda: as reference an environment.yaml was added
 
-Run `make install` and check `install.log` - installs all requirments
+Run `make install` to install all requirements and check `install.log`.
 
 For training you might need an embedding for initialization of the embedding layer. 
 
-Run `make embedding` to download the pre-trained embeddings 
+Run `make embedding` to download pre-trained embeddings, you will be prompted.
 
 The application is written in python3 and tested under Mac and Linux. For training the classifier it's recommended to use a GPU with CUDA >9. For reference this package was tested with `Python 3.7.4 [Clang 4.0.1 (tags/RELEASE_401/final)] :: Anaconda, Inc..`.
 
@@ -28,7 +28,7 @@ The make file downloads the following embeddings:
 * simple wikipedia fasttext embedding
 * German CC fasttext embedding
 
-On Mac you might need to install libomp via brew.
+On Mac you might need to install libomp via brew beforehand.
 
 ## Data Structure
 
