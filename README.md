@@ -1,7 +1,11 @@
 # lttc - eL double Tee See
 
-Supervised textclassification Demo using BERT and CNN with PyTorch.
+Compared with initializing a new language model and training it with a limited dataset, language models pretrained on large-scale data usually have higher accuracy since they have already learned linguistic patterns which can be transferred onto other tasks. The most popular pretrained NLP model is actually Google’s BERT (Bidirectional Encoder Representations from Transformers).
+
+This project provides a supervised textclassification Demo using BERT and CNN with PyTorch.
 The implementation is suitable for different classification document scenarios. Sequences per line of text are classified.
+
+Additionally this demo utilizes a start of the art Python API framework in order to easily make classifiers available in real world scenarios.
 
 The Convolutional Neural Networks based upon the ideas of (Kim, 2014). Further reading: [Understanding Convolutional Neural Networks for NLP](http://www.wildml.com/2015/11/understanding-convolutional-neural-networks-for-nlp/).
 
@@ -12,9 +16,26 @@ Further inbuild classification techniques are:
 
 The models have by default a softmax layer as ouput layer. So multi class is working out-of-the-box.
 
+## Available optimizations
+
+Transformer-based architectures trust entirely on self-attention mechanisms to draw global dependencies between inputs and outputs.
+
+A self-attention module takes in n inputs, and returns n outputs, wherby inputs interact with each other (“self”) and find out who they should pay more attention to (“attention”). The outputs are aggregates of these interactions and attention scores.
+
+In the meanwhile there are several use cse specific optimizations available:
+
+* [RoBERTa](https://arxiv.org/abs/1907.11692) a optimized pretraining approach proven on GLUE, RACE and SQuAD
+* [ALBERT] (https://openreview.net/pdf?id=H1eA7AEtvS) provides a parameter-reduction techniques to lower memory consumption and increase the training speed of BERT
+* [SpanBERT](https://arxiv.org/abs/1907.10529) extends BERT by masking contiguous random spans, rather than random tokens and proposes improvements on span selection tasks such as question answering and coreference resolution
+* [SesameBERT](https://arxiv.org/abs/1910.03176) emphasizes the importance of local contexts by Squeeze and Excitation and enriching local information by capturing neighboring contexts via Gaussian blurring
+* [SemBERT](https://arxiv.org/abs/1909.02209): existing language representation models including ELMo, GPT and BERT only exploit plain context-sensitive features such as character or word embeddings, but do not incorporate structured semantic information. It proposes to improve results on reading comprehension and language inference tasks.
+* [MobileBERT](https://openreview.net/forum?id=SJxjVaNKwB)is a condensed version of BERT trained on SQuAD dataset. Ther is a nice implementatin with [Tensorflow light](https://www.tensorflow.org/lite/models/bert_qa/overview) which can be run on mobile platforms
+* [TinyBERT](https://arxiv.org/abs/1909.10351) It's a different approach to MobileBERT in order to compress model size while maintaining accuracy. The researchers have developed a “knowledge distillation (KD)” and “teacher-student” framework which transfers linguistic features learned from a large-scale teacher network to a smaller-scale student network trained to mimic the behaviour of the teacher. Transformer distillation is designed to efficiently distill linguistic patterns embedded in the teacher BERT
+* [CamemBERT](https://arxiv.org/abs/1911.03894)is really a "Tasty French Language Model" ;-). It is based on the RoBERTa architecture and has been trained on 138GB of French text. It's an example for improvements over previous monolingual and multilingual approaches
+
 ## Installing
 
-For convenience there is a makefile. However, especially during build of cython there could be problems depending on your environment. You might walk through the steps manually if this happens. As pyfasttext is no longer maintained in the offical repo: you might use the official Python binding from the [fastText repository](https://github.com/facebookresearch/fastText/tree/master/python).
+For convenience there is a makefile. However, especially during build of cython, pandas and pytorch there could be problems depending on your environment. You might walk through the steps manually if this happens. As pyfasttext is no longer maintained in the offical repo: you might use the official Python binding from the [fastText repository](https://github.com/facebookresearch/fastText/tree/master/python).
 
 Recommendations:
 
